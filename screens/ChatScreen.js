@@ -1,4 +1,5 @@
 import { OPENAI_API_KEY } from "@env";
+import * as Notifications from "expo-notifications";
 import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
@@ -24,7 +25,7 @@ export default function ChatScreen() {
           memory.tasks?.forEach((task) => {
             const aiMessage = {
               sender: "ai",
-              text: `오늘 \"${task}\" 한다고 했잖아. 지금 하고 있어?`,
+              text: `오늘 "${task}" 한다고 했잖아. 지금 하고 있어?`,
             };
             setMessages((prev) => [...prev, aiMessage]);
           });
@@ -49,6 +50,7 @@ export default function ChatScreen() {
 
     const todayTasks = await extractTodayTasks(userText);
     const extractedDate = await extractDate(userText);
+    const extractedTime = await extractTime(userText);
 
     const memory = {
       user: userText,
@@ -57,14 +59,68 @@ export default function ChatScreen() {
       type: todayTasks.length > 0 ? "todayTask" : "normal",
       tasks: todayTasks,
       meta: extractedDate
-        ? { date: extractedDate, event: "알 수 없음" }
+        ? { date: extractedDate, time: extractedTime, event: "알 수 없음" }
         : undefined,
     };
     await saveMemory(memory);
+    await scheduleNotification(userText, extractedDate, extractedTime);
+  };
+
+  const scheduleNotification = async (text, date, time) => {
+    if (!date || !time) return;
+    const triggerDate = new Date(`${date}T${time}:00`);
+    await Notifications.scheduleNotificationAsync({
+      content: {
+        title: "📌 약속 시간!",
+        body: `"${text}" 할 시간이야.`,
+      },
+      trigger: triggerDate,
+    });
+  };
+
+  const extractTime = async (text) => {
+    try {
+      const response = await fetch(
+        "https://api.openai.com/v1/chat/completions",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${OPENAI_API_KEY}`,
+          },
+          body: JSON.stringify({
+            model: "gpt-3.5-turbo",
+            messages: [
+              {
+                role: "system",
+                content: `사용자의 문장에서 시간 정보를 HH:mm 형식(24시간)으로 추출해줘. 예: "오후 3시에 운동" → "15:00". 시간 없으면 "null"만 응답.`,
+              },
+              { role: "user", content: text },
+            ],
+          }),
+        }
+      );
+
+      const data = await response.json();
+      const content = data.choices?.[0]?.message?.content.trim();
+      return content === "null" ? null : content;
+    } catch (err) {
+      console.error("시간 추출 실패:", err);
+      return null;
+    }
   };
 
   const getAIResponse = async (text) => {
     try {
+      const memories = await getMemories();
+      const recent = memories
+        .slice(-5)
+        .map((m) => [
+          { role: "user", content: m.user },
+          { role: "assistant", content: m.ai },
+        ])
+        .flat();
+
       const response = await fetch(
         "https://api.openai.com/v1/chat/completions",
         {
@@ -81,6 +137,7 @@ export default function ChatScreen() {
                 content:
                   "너는 현실적인 조언을 잘 해주는 AI야. 고민, 귀찮음, 불안함 같은 상황에 현실적인 조언을 해줘.",
               },
+              ...recent,
               { role: "user", content: text },
             ],
           }),
@@ -157,7 +214,7 @@ export default function ChatScreen() {
       const data = await response.json();
       const content = data.choices?.[0]?.message?.content.trim();
       if (content === "null") return null;
-      return content; // ex: "2025-06-05"
+      return content;
     } catch (err) {
       console.error("날짜 추출 실패:", err);
       return null;
