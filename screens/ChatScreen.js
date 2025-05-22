@@ -1,16 +1,14 @@
-// screens/ChatScreen.js
 import { OPENAI_API_KEY } from "@env";
 import React, { useState } from "react";
 import {
-  KeyboardAvoidingView,
-  Platform,
-  ScrollView,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
   View,
 } from "react-native";
+import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { saveMemory } from "../utils/memoryStore";
 
 export default function ChatScreen() {
   const [messages, setMessages] = useState([]);
@@ -19,15 +17,22 @@ export default function ChatScreen() {
   const handleSend = async () => {
     if (!input.trim()) return;
 
-    const userMessage = { sender: "user", text: input };
-    setMessages([...messages, userMessage]);
+    const userText = input;
+    const userMessage = { sender: "user", text: userText };
+    setMessages((prev) => [...prev, userMessage]);
     setInput("");
 
-    // GPT 응답 시뮬레이션
-    const aiReply = await getAIResponse(input);
-
+    const aiReply = await getAIResponse(userText);
     const aiMessage = { sender: "ai", text: aiReply };
     setMessages((prev) => [...prev, aiMessage]);
+
+    // ✅ 여기서 저장
+    const memory = {
+      user: userText,
+      ai: aiReply,
+      timestamp: new Date().toISOString(),
+    };
+    await saveMemory(memory);
   };
 
   const getAIResponse = async (text) => {
@@ -65,16 +70,14 @@ export default function ChatScreen() {
   };
 
   return (
-    <KeyboardAvoidingView
-      style={{ flex: 1 }}
-      behavior={Platform.OS === "ios" ? "padding" : "height"}
-      keyboardVerticalOffset={Platform.OS === "ios" ? 60 : 0}
+    <KeyboardAwareScrollView
+      style={styles.container}
+      contentContainerStyle={styles.contentContainer}
+      enableOnAndroid={true}
+      extraScrollHeight={20}
+      keyboardShouldPersistTaps="handled"
     >
-      <ScrollView
-        style={styles.chatContainer}
-        contentContainerStyle={{ paddingBottom: 20 }}
-        keyboardShouldPersistTaps="handled"
-      >
+      <View style={styles.chatContainer}>
         {messages.map((msg, index) => (
           <Text
             key={index}
@@ -83,7 +86,7 @@ export default function ChatScreen() {
             {msg.sender === "user" ? "👤 " : "🤖 "} {msg.text}
           </Text>
         ))}
-      </ScrollView>
+      </View>
 
       <View style={styles.inputContainer}>
         <TextInput
@@ -91,21 +94,32 @@ export default function ChatScreen() {
           value={input}
           onChangeText={setInput}
           placeholder="메시지를 입력하세요"
-          placeholderTextColor="#999" // 추가: placeholder 색상
+          placeholderTextColor="#999"
           selectionColor="#007AFF"
-          color="white"
+          color="#000"
         />
         <TouchableOpacity onPress={handleSend} style={styles.sendButton}>
           <Text style={{ color: "white" }}>전송</Text>
         </TouchableOpacity>
       </View>
-    </KeyboardAvoidingView>
+    </KeyboardAwareScrollView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, padding: 10, paddingTop: 50 },
-  chatContainer: { flex: 1 },
+  container: {
+    flex: 1,
+    backgroundColor: "#fff",
+  },
+  contentContainer: {
+    flexGrow: 1,
+    justifyContent: "space-between",
+    paddingTop: 50,
+    paddingHorizontal: 10,
+  },
+  chatContainer: {
+    flex: 1,
+  },
   userText: {
     alignSelf: "flex-end",
     margin: 5,
@@ -120,13 +134,19 @@ const styles = StyleSheet.create({
     padding: 10,
     borderRadius: 10,
   },
-  inputContainer: { flexDirection: "row", alignItems: "center" },
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginTop: 10,
+  },
   input: {
     flex: 1,
     borderColor: "#CCC",
     borderWidth: 1,
     borderRadius: 10,
     padding: 10,
+    backgroundColor: "#fff",
+    color: "#000",
   },
   sendButton: {
     marginLeft: 10,
