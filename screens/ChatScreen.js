@@ -10,6 +10,7 @@ import {
 } from "react-native";
 import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
 import { getMemories, saveMemory } from "../utils/memoryStore";
+import { scheduleNotificationWithId } from "./HomeScreen";
 
 export default function ChatScreen() {
   const [messages, setMessages] = useState([]);
@@ -52,6 +53,13 @@ export default function ChatScreen() {
     const extractedDate = await extractDate(userText);
     const extractedTime = await extractTime(userText);
 
+    // 🆕 알림 등록하고 ID 저장
+    const notificationId = await scheduleNotificationWithId(
+      userText,
+      extractedDate,
+      extractedTime
+    );
+
     const memory = {
       user: userText,
       ai: aiReply,
@@ -59,11 +67,16 @@ export default function ChatScreen() {
       type: todayTasks.length > 0 ? "todayTask" : "normal",
       tasks: todayTasks,
       meta: extractedDate
-        ? { date: extractedDate, time: extractedTime, event: "알 수 없음" }
+        ? {
+            date: extractedDate,
+            time: extractedTime,
+            event: "알 수 없음",
+            notificationId,
+          }
         : undefined,
     };
+
     await saveMemory(memory);
-    await scheduleNotification(userText, extractedDate, extractedTime);
   };
 
   const scheduleNotification = async (text, date, time) => {

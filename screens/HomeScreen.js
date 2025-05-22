@@ -1,5 +1,6 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
+import * as Notifications from "expo-notifications";
 import React, { useEffect, useState } from "react";
 import {
   Pressable,
@@ -9,7 +10,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { getMemories } from "../utils/memoryStore";
+import { getMemories, saveMemories } from "../utils/memoryStore";
 
 export default function HomeScreen() {
   const [todayTasks, setTodayTasks] = useState([]);
@@ -20,79 +21,78 @@ export default function HomeScreen() {
   const [scheduled, setScheduled] = useState([]);
   const navigation = useNavigation();
 
-  useEffect(() => {
-    const loadMemories = async () => {
-      const memories = await getMemories();
-      const today = new Date().toISOString().split("T")[0];
+  const loadMemories = async () => {
+    const memories = await getMemories();
+    const today = new Date().toISOString().split("T")[0];
 
-      const todayTasksList = [];
-      const futureEventsList = [];
-      const worriesList = [];
-      const emotionList = [];
-      const scheduledList = [];
+    const todayTasksList = [];
+    const futureEventsList = [];
+    const worriesList = [];
+    const emotionList = [];
+    const scheduledList = [];
 
-      memories.forEach((memory) => {
-        if (memory.type === "todayTask" && memory.timestamp.startsWith(today)) {
-          todayTasksList.push(...(memory.tasks || []));
-        }
-
-        if (memory.meta?.date > today) {
-          futureEventsList.push({
-            event: memory.meta?.event,
-            date: memory.meta?.date,
-          });
-        }
-
-        if (memory.meta?.date && memory.meta?.time) {
-          scheduledList.push({
-            event: memory.meta?.event || memory.user,
-            date: memory.meta.date,
-            time: memory.meta.time,
-          });
-        }
-
-        if (
-          memory.user.includes("걱정") ||
-          memory.user.includes("불안") ||
-          memory.user.includes("스트레스")
-        ) {
-          worriesList.push(memory.user);
-        }
-
-        const emotionTags = [
-          "우울",
-          "불안",
-          "슬픔",
-          "짜증",
-          "외로움",
-          "무기력",
-        ];
-        if (emotionTags.some((tag) => memory.user.includes(tag))) {
-          const tag = emotionTags.find((t) => memory.user.includes(t));
-          if (tag) emotionList.push(tag);
-        }
-      });
-
-      setTodayTasks(todayTasksList);
-      setFutureEvents(futureEventsList);
-      setWorries(worriesList);
-      setEmotions(emotionList);
-      setScheduled(
-        scheduledList.sort(
-          (a, b) =>
-            new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`)
-        )
-      );
-
-      const stored = await AsyncStorage.getItem("taskCompletion");
-      if (stored) {
-        const parsed = JSON.parse(stored);
-        setTaskCompletion(parsed);
-      } else {
-        setTaskCompletion(Array(todayTasksList.length).fill(false));
+    memories.forEach((memory, index) => {
+      if (memory.type === "todayTask" && memory.timestamp.startsWith(today)) {
+        todayTasksList.push(...(memory.tasks || []));
       }
-    };
 
+      if (memory.meta?.date > today) {
+        futureEventsList.push({
+          event: memory.meta?.event,
+          date: memory.meta?.date,
+        });
+      }
+
+      if (
+        memory.meta?.date &&
+        memory.meta?.time &&
+        memory.meta?.notificationId
+      ) {
+        scheduledList.push({
+          id: index,
+          notificationId: memory.meta.notificationId,
+          event: memory.meta?.event || memory.user,
+          date: memory.meta.date,
+          time: memory.meta.time,
+        });
+      }
+
+      if (
+        memory.user.includes("걱정") ||
+        memory.user.includes("불안") ||
+        memory.user.includes("스트레스")
+      ) {
+        worriesList.push(memory.user);
+      }
+
+      const emotionTags = ["우울", "불안", "슬픔", "짜증", "외로움", "무기력"];
+      if (emotionTags.some((tag) => memory.user.includes(tag))) {
+        const tag = emotionTags.find((t) => memory.user.includes(t));
+        if (tag) emotionList.push(tag);
+      }
+    });
+
+    setTodayTasks(todayTasksList);
+    setFutureEvents(futureEventsList);
+    setWorries(worriesList);
+    setEmotions(emotionList);
+    setScheduled(
+      scheduledList.sort(
+        (a, b) =>
+          new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`)
+      )
+    );
+
+    const stored = await AsyncStorage.getItem("taskCompletion");
+    if (stored) {
+      const parsed = JSON.parse(stored);
+      setTaskCompletion(parsed);
+    } else {
+      setTaskCompletion(Array(todayTasksList.length).fill(false));
+    }
+  };
+
+  useEffect(() => {
     loadMemories();
   }, []);
 
@@ -101,6 +101,20 @@ export default function HomeScreen() {
     updated[index] = !updated[index];
     setTaskCompletion(updated);
     await AsyncStorage.setItem("taskCompletion", JSON.stringify(updated));
+  };
+
+  const deleteScheduledItem = async (index, notificationId) => {
+    const memories = await getMemories();
+    memories.splice(index, 1);
+    await saveMemories(memories);
+    if (notificationId) {
+      try {
+        await Notifications.cancelScheduledNotificationAsync(notificationId);
+      } catch (e) {
+        console.warn("알림 취소 실패:", e);
+      }
+    }
+    await loadMemories();
   };
 
   const getCompletionRate = () => {
@@ -153,9 +167,16 @@ export default function HomeScreen() {
       <Text style={styles.heading}>예정된 알림 ⏰</Text>
       {scheduled.length > 0 ? (
         scheduled.map((item, idx) => (
-          <Text key={idx} style={styles.item}>
-            - {item.event} ({item.date} {item.time})
-          </Text>
+          <View key={idx} style={styles.taskRow}>
+            <Text style={styles.item}>
+              - {item.event} ({item.date} {item.time})
+            </Text>
+            <TouchableOpacity
+              onPress={() => deleteScheduledItem(item.id, item.notificationId)}
+            >
+              <Text style={{ color: "red", marginLeft: 10 }}>❌</Text>
+            </TouchableOpacity>
+          </View>
         ))
       ) : (
         <Text style={styles.empty}>예정된 알림이 없어요.</Text>
