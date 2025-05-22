@@ -17,6 +17,7 @@ export default function HomeScreen() {
   const [futureEvents, setFutureEvents] = useState([]);
   const [worries, setWorries] = useState([]);
   const [emotions, setEmotions] = useState([]);
+  const [scheduled, setScheduled] = useState([]);
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -28,14 +29,25 @@ export default function HomeScreen() {
       const futureEventsList = [];
       const worriesList = [];
       const emotionList = [];
+      const scheduledList = [];
 
       memories.forEach((memory) => {
         if (memory.type === "todayTask" && memory.timestamp.startsWith(today)) {
           todayTasksList.push(...(memory.tasks || []));
-        } else if (memory.meta?.date > today) {
+        }
+
+        if (memory.meta?.date > today) {
           futureEventsList.push({
             event: memory.meta?.event,
             date: memory.meta?.date,
+          });
+        }
+
+        if (memory.meta?.date && memory.meta?.time) {
+          scheduledList.push({
+            event: memory.meta?.event || memory.user,
+            date: memory.meta.date,
+            time: memory.meta.time,
           });
         }
 
@@ -65,6 +77,12 @@ export default function HomeScreen() {
       setFutureEvents(futureEventsList);
       setWorries(worriesList);
       setEmotions(emotionList);
+      setScheduled(
+        scheduledList.sort(
+          (a, b) =>
+            new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`)
+        )
+      );
 
       const stored = await AsyncStorage.getItem("taskCompletion");
       if (stored) {
@@ -130,6 +148,17 @@ export default function HomeScreen() {
             ? " 잘하고 있어! 👍"
             : " 조금만 더 힘내보자! 💪"}
         </Text>
+      )}
+
+      <Text style={styles.heading}>예정된 알림 ⏰</Text>
+      {scheduled.length > 0 ? (
+        scheduled.map((item, idx) => (
+          <Text key={idx} style={styles.item}>
+            - {item.event} ({item.date} {item.time})
+          </Text>
+        ))
+      ) : (
+        <Text style={styles.empty}>예정된 알림이 없어요.</Text>
       )}
 
       <Text style={styles.heading}>다가오는 일정 📅</Text>
