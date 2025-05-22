@@ -1,12 +1,22 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import React, { useEffect, useState } from "react";
-import { ScrollView, StyleSheet, Text, TouchableOpacity } from "react-native";
+import {
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
 import { getMemories } from "../utils/memoryStore";
 
 export default function HomeScreen() {
   const [todayTasks, setTodayTasks] = useState([]);
+  const [taskCompletion, setTaskCompletion] = useState([]);
   const [futureEvents, setFutureEvents] = useState([]);
   const [worries, setWorries] = useState([]);
+  const [emotions, setEmotions] = useState([]);
   const navigation = useNavigation();
 
   useEffect(() => {
@@ -17,6 +27,7 @@ export default function HomeScreen() {
       const todayTasksList = [];
       const futureEventsList = [];
       const worriesList = [];
+      const emotionList = [];
 
       memories.forEach((memory) => {
         if (memory.type === "todayTask" && memory.timestamp.startsWith(today)) {
@@ -26,22 +37,59 @@ export default function HomeScreen() {
             event: memory.meta?.event,
             date: memory.meta?.date,
           });
-        } else if (
+        }
+
+        if (
           memory.user.includes("걱정") ||
           memory.user.includes("불안") ||
           memory.user.includes("스트레스")
         ) {
           worriesList.push(memory.user);
         }
+
+        const emotionTags = [
+          "우울",
+          "불안",
+          "슬픔",
+          "짜증",
+          "외로움",
+          "무기력",
+        ];
+        if (emotionTags.some((tag) => memory.user.includes(tag))) {
+          const tag = emotionTags.find((t) => memory.user.includes(t));
+          if (tag) emotionList.push(tag);
+        }
       });
 
       setTodayTasks(todayTasksList);
       setFutureEvents(futureEventsList);
       setWorries(worriesList);
+      setEmotions(emotionList);
+
+      const stored = await AsyncStorage.getItem("taskCompletion");
+      if (stored) {
+        const parsed = JSON.parse(stored);
+        setTaskCompletion(parsed);
+      } else {
+        setTaskCompletion(Array(todayTasksList.length).fill(false));
+      }
     };
 
     loadMemories();
   }, []);
+
+  const toggleTaskCompletion = async (index) => {
+    const updated = [...taskCompletion];
+    updated[index] = !updated[index];
+    setTaskCompletion(updated);
+    await AsyncStorage.setItem("taskCompletion", JSON.stringify(updated));
+  };
+
+  const getCompletionRate = () => {
+    const total = taskCompletion.length;
+    const done = taskCompletion.filter(Boolean).length;
+    return total > 0 ? Math.round((done / total) * 100) : 0;
+  };
 
   return (
     <ScrollView
@@ -51,12 +99,37 @@ export default function HomeScreen() {
       <Text style={styles.heading}>오늘 해야 할 일 📝</Text>
       {todayTasks.length > 0 ? (
         todayTasks.map((task, idx) => (
-          <Text key={idx} style={styles.item}>
-            - {task}
-          </Text>
+          <Pressable
+            key={idx}
+            onPress={() => toggleTaskCompletion(idx)}
+            style={styles.taskRow}
+          >
+            <View
+              style={[
+                styles.checkbox,
+                taskCompletion[idx] && styles.checkedBox,
+              ]}
+            />
+            <Text
+              style={[styles.item, taskCompletion[idx] && styles.checkedText]}
+            >
+              {task}
+            </Text>
+          </Pressable>
         ))
       ) : (
         <Text style={styles.empty}>아직 저장된 할 일이 없어요.</Text>
+      )}
+
+      {todayTasks.length > 0 && (
+        <Text style={styles.completionMessage}>
+          🎉 오늘 할 일 완료율: {getCompletionRate()}%
+          {getCompletionRate() === 100
+            ? "! 완벽해! 👏"
+            : getCompletionRate() >= 50
+            ? " 잘하고 있어! 👍"
+            : " 조금만 더 힘내보자! 💪"}
+        </Text>
       )}
 
       <Text style={styles.heading}>다가오는 일정 📅</Text>
@@ -79,6 +152,15 @@ export default function HomeScreen() {
         ))
       ) : (
         <Text style={styles.empty}>최근 고민도 잘 없었네요 :)</Text>
+      )}
+
+      <Text style={styles.heading}>감정 요약 🧠</Text>
+      {emotions.length > 0 ? (
+        <Text style={styles.item}>
+          최근 자주 느낀 감정: {Array.from(new Set(emotions)).join(", ")}
+        </Text>
+      ) : (
+        <Text style={styles.empty}>감정 표현이 감지되지 않았어요.</Text>
       )}
 
       <TouchableOpacity
@@ -124,5 +206,31 @@ const styles = StyleSheet.create({
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
+  },
+  taskRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 10,
+  },
+  checkbox: {
+    width: 20,
+    height: 20,
+    borderWidth: 1,
+    borderColor: "#007AFF",
+    marginRight: 10,
+    borderRadius: 4,
+  },
+  checkedBox: {
+    backgroundColor: "#007AFF",
+  },
+  checkedText: {
+    textDecorationLine: "line-through",
+    color: "#999",
+  },
+  completionMessage: {
+    fontSize: 16,
+    marginTop: 5,
+    marginBottom: 10,
+    color: "#444",
   },
 });
