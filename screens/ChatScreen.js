@@ -1,5 +1,5 @@
 import { OPENAI_API_KEY } from "@env";
-import * as Notifications from "expo-notifications";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import React, { useEffect, useState } from "react";
 import {
   StyleSheet,
@@ -17,6 +17,11 @@ export default function ChatScreen() {
   const [input, setInput] = useState("");
 
   useEffect(() => {
+    const loadChat = async () => {
+      const saved = await AsyncStorage.getItem("chatMessages");
+      if (saved) setMessages(JSON.parse(saved));
+    };
+
     const checkTodayTasks = async () => {
       const allMemories = await getMemories();
       const today = new Date().toISOString().split("T")[0];
@@ -28,12 +33,17 @@ export default function ChatScreen() {
               sender: "ai",
               text: `오늘 "${task}" 한다고 했잖아. 지금 하고 있어?`,
             };
-            setMessages((prev) => [...prev, aiMessage]);
+            setMessages((prev) => {
+              const updated = [...prev, aiMessage];
+              AsyncStorage.setItem("chatMessages", JSON.stringify(updated));
+              return updated;
+            });
           });
         }
       });
     };
 
+    loadChat();
     checkTodayTasks();
   }, []);
 
@@ -42,18 +52,21 @@ export default function ChatScreen() {
 
     const userText = input;
     const userMessage = { sender: "user", text: userText };
-    setMessages((prev) => [...prev, userMessage]);
+    const updated = [...messages, userMessage];
+    setMessages(updated);
+    await AsyncStorage.setItem("chatMessages", JSON.stringify(updated));
     setInput("");
 
     const aiReply = await getAIResponse(userText);
     const aiMessage = { sender: "ai", text: aiReply };
-    setMessages((prev) => [...prev, aiMessage]);
+    const final = [...updated, aiMessage];
+    setMessages(final);
+    await AsyncStorage.setItem("chatMessages", JSON.stringify(final));
 
     const todayTasks = await extractTodayTasks(userText);
     const extractedDate = await extractDate(userText);
     const extractedTime = await extractTime(userText);
 
-    // 🆕 알림 등록하고 ID 저장
     const notificationId = await scheduleNotificationWithId(
       userText,
       extractedDate,
@@ -79,18 +92,6 @@ export default function ChatScreen() {
     await saveMemory(memory);
   };
 
-  const scheduleNotification = async (text, date, time) => {
-    if (!date || !time) return;
-    const triggerDate = new Date(`${date}T${time}:00`);
-    await Notifications.scheduleNotificationAsync({
-      content: {
-        title: "📌 약속 시간!",
-        body: `"${text}" 할 시간이야.`,
-      },
-      trigger: triggerDate,
-    });
-  };
-
   const extractTime = async (text) => {
     try {
       const response = await fetch(
@@ -106,14 +107,13 @@ export default function ChatScreen() {
             messages: [
               {
                 role: "system",
-                content: `사용자의 문장에서 시간 정보를 HH:mm 형식(24시간)으로 추출해줘. 예: "오후 3시에 운동" → "15:00". 시간 없으면 "null"만 응답.`,
+                content: `사용자의 문장에서 시간 정보를 HH:mm 형식(24시간)으로 추출해줘. 시간 없으면 \"null\"만 응답.`,
               },
               { role: "user", content: text },
             ],
           }),
         }
       );
-
       const data = await response.json();
       const content = data.choices?.[0]?.message?.content.trim();
       return content === "null" ? null : content;
@@ -182,14 +182,13 @@ export default function ChatScreen() {
             messages: [
               {
                 role: "system",
-                content: `너는 사용자의 계획 중 '오늘 할 일'만 뽑아주는 도우미야. 간단히 JSON 배열로만 대답해줘. 예: \"오늘은 공부 3시간 하고 운동도 할 거야\" -> [\"공부 3시간\", \"운동\"]`,
+                content: `너는 사용자의 계획 중 '오늘 할 일'만 뽑아주는 도우미야. JSON 배열로만 대답해줘.`,
               },
               { role: "user", content: text },
             ],
           }),
         }
       );
-
       const data = await response.json();
       const parsed = JSON.parse(data.choices?.[0]?.message?.content);
       return Array.isArray(parsed) ? parsed : [];
@@ -214,20 +213,18 @@ export default function ChatScreen() {
             messages: [
               {
                 role: "system",
-                content: `너는 사용자의 문장에서 약속, 일정, 시험 같은 날짜를 찾아서 YYYY-MM-DD 형식으로 추출해주는 도우미야. 오늘 날짜는 ${
+                content: `너는 사용자의 문장에서 날짜를 YYYY-MM-DD 형식으로 추출해주는 도우미야. 오늘 날짜는 ${
                   new Date().toISOString().split("T")[0]
-                }이고, 날짜가 없다면 null이라고만 응답해.`,
+                }이고, 없으면 null이라고만 응답해.`,
               },
               { role: "user", content: text },
             ],
           }),
         }
       );
-
       const data = await response.json();
       const content = data.choices?.[0]?.message?.content.trim();
-      if (content === "null") return null;
-      return content;
+      return content === "null" ? null : content;
     } catch (err) {
       console.error("날짜 추출 실패:", err);
       return null;

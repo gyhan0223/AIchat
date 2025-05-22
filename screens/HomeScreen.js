@@ -1,3 +1,4 @@
+// ... import는 그대로 유지
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
 import * as Notifications from "expo-notifications";
@@ -25,56 +26,6 @@ export const scheduleNotificationWithId = async (text, date, time) => {
   return id;
 };
 
-export const generateStats = (memories) => {
-  const emotionTags = ["우울", "불안", "슬픔", "짜증", "외로움", "무기력"];
-  const today = new Date();
-  const weekAgo = new Date();
-  weekAgo.setDate(today.getDate() - 6);
-  const thisWeek = memories.filter((m) => {
-    const date = new Date(m.timestamp);
-    return date >= weekAgo && date <= today;
-  });
-
-  const emotionMap = {};
-  for (const m of thisWeek) {
-    for (const tag of emotionTags) {
-      if (m.user.includes(tag)) {
-        emotionMap[tag] = (emotionMap[tag] || 0) + 1;
-      }
-    }
-  }
-
-  const taskDays = thisWeek.filter(
-    (m) => m.type === "todayTask" && m.tasks?.length
-  );
-  const totalTasks = taskDays.reduce((sum, m) => sum + m.tasks.length, 0);
-  const estimatedDone = Math.round(totalTasks * 0.7);
-  const completionRate = totalTasks
-    ? Math.round((estimatedDone / totalTasks) * 100)
-    : 0;
-
-  const words = thisWeek
-    .map((m) => m.user)
-    .join(" ")
-    .split(/\s+/);
-  const wordMap = {};
-  words.forEach((w) => {
-    if (w.length > 1 && !emotionTags.includes(w)) {
-      wordMap[w] = (wordMap[w] || 0) + 1;
-    }
-  });
-  const topKeywords = Object.entries(wordMap)
-    .sort((a, b) => b[1] - a[1])
-    .slice(0, 3)
-    .map(([w]) => w);
-
-  return {
-    emotions: emotionMap,
-    completionRate,
-    topKeywords,
-  };
-};
-
 export default function HomeScreen() {
   const [todayTasks, setTodayTasks] = useState([]);
   const [taskCompletion, setTaskCompletion] = useState([]);
@@ -82,7 +33,6 @@ export default function HomeScreen() {
   const [worries, setWorries] = useState([]);
   const [emotions, setEmotions] = useState([]);
   const [scheduled, setScheduled] = useState([]);
-  const [stats, setStats] = useState(null);
   const navigation = useNavigation();
 
   const loadMemories = async () => {
@@ -146,7 +96,6 @@ export default function HomeScreen() {
           new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`)
       )
     );
-    setStats(generateStats(memories));
 
     const stored = await AsyncStorage.getItem("taskCompletion");
     if (stored) {
@@ -193,22 +142,6 @@ export default function HomeScreen() {
       style={styles.container}
       contentContainerStyle={{ paddingBottom: 40 }}
     >
-      {stats && (
-        <View style={styles.statsCard}>
-          <Text style={styles.heading}>📊 이번 주 요약</Text>
-          <Text style={styles.item}>할 일 완료율: {stats.completionRate}%</Text>
-          <Text style={styles.item}>
-            감정 분포:{" "}
-            {Object.entries(stats.emotions)
-              .map(([k, v]) => `${k}(${v})`)
-              .join(", ") || "없음"}
-          </Text>
-          <Text style={styles.item}>
-            키워드: {stats.topKeywords.join(", ") || "없음"}
-          </Text>
-        </View>
-      )}
-
       <Text style={styles.heading}>오늘 해야 할 일 📝</Text>
       {todayTasks.length > 0 ? (
         todayTasks.map((task, idx) => (
@@ -363,11 +296,5 @@ const styles = StyleSheet.create({
     marginTop: 5,
     marginBottom: 10,
     color: "#444",
-  },
-  statsCard: {
-    padding: 15,
-    backgroundColor: "#f0f0f0",
-    borderRadius: 12,
-    marginBottom: 20,
   },
 });
