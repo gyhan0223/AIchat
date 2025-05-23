@@ -1,20 +1,28 @@
 import { OPENAI_API_KEY } from "@env";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import React, { useEffect, useState } from "react";
+import { useNavigation } from "@react-navigation/native";
+import { useEffect, useRef, useState } from "react";
 import {
+  FlatList,
+  Keyboard,
+  KeyboardAvoidingView,
+  Platform,
   StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
+  TouchableWithoutFeedback,
   View,
 } from "react-native";
-import { KeyboardAwareScrollView } from "react-native-keyboard-aware-scroll-view";
+import { SafeAreaView } from "react-native-safe-area-context";
 import { getMemories, saveMemory } from "../utils/memoryStore";
 import { scheduleNotificationWithId } from "./HomeScreen";
 
 export default function ChatScreen() {
+  const navigation = useNavigation();
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
+  const flatListRef = useRef();
 
   useEffect(() => {
     const loadChat = async () => {
@@ -56,12 +64,14 @@ export default function ChatScreen() {
     setMessages(updated);
     await AsyncStorage.setItem("chatMessages", JSON.stringify(updated));
     setInput("");
+    scrollToBottom();
 
     const aiReply = await getAIResponse(userText);
     const aiMessage = { sender: "ai", text: aiReply };
     const final = [...updated, aiMessage];
     setMessages(final);
     await AsyncStorage.setItem("chatMessages", JSON.stringify(final));
+    scrollToBottom();
 
     const todayTasks = await extractTodayTasks(userText);
     const extractedDate = await extractDate(userText);
@@ -92,6 +102,10 @@ export default function ChatScreen() {
     await saveMemory(memory);
   };
 
+  const scrollToBottom = () => {
+    flatListRef.current?.scrollToEnd({ animated: true });
+  };
+
   const extractTime = async (text) => {
     try {
       const response = await fetch(
@@ -107,7 +121,7 @@ export default function ChatScreen() {
             messages: [
               {
                 role: "system",
-                content: `사용자의 문장에서 시간 정보를 HH:mm 형식(24시간)으로 추출해줘. 시간 없으면 \"null\"만 응답.`,
+                content: `사용자의 문장에서 시간 정보를 HH:mm 형식(24시간)으로 추출해줘. 시간 없으면 "null"만 응답.`,
               },
               { role: "user", content: text },
             ],
@@ -189,6 +203,7 @@ export default function ChatScreen() {
           }),
         }
       );
+
       const data = await response.json();
       const parsed = JSON.parse(data.choices?.[0]?.message?.content);
       return Array.isArray(parsed) ? parsed : [];
@@ -222,6 +237,7 @@ export default function ChatScreen() {
           }),
         }
       );
+
       const data = await response.json();
       const content = data.choices?.[0]?.message?.content.trim();
       return content === "null" ? null : content;
@@ -232,88 +248,149 @@ export default function ChatScreen() {
   };
 
   return (
-    <KeyboardAwareScrollView
-      style={styles.container}
-      contentContainerStyle={styles.contentContainer}
-      enableOnAndroid={true}
-      extraScrollHeight={20}
-      keyboardShouldPersistTaps="handled"
-    >
-      <View style={styles.chatContainer}>
-        {messages.map((msg, index) => (
-          <Text
-            key={index}
-            style={msg.sender === "user" ? styles.userText : styles.aiText}
+    <TouchableWithoutFeedback onPress={Keyboard.dismiss} accessible={false}>
+      <View style={{ flex: 1 }}>
+        <SafeAreaView style={styles.header}>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => navigation.goBack()}
           >
-            {msg.sender === "user" ? "👤 " : "🤖 "} {msg.text}
-          </Text>
-        ))}
-      </View>
+            <Text style={styles.headerButtonText}>←</Text>
+          </TouchableOpacity>
+          <Text style={styles.headerTitle}>대화</Text>
+          <TouchableOpacity
+            style={styles.headerButton}
+            onPress={() => navigation.navigate("Settings")}
+          >
+            <Text style={styles.headerButtonText}>☰</Text>
+          </TouchableOpacity>
+        </SafeAreaView>
 
-      <View style={styles.inputContainer}>
-        <TextInput
-          style={styles.input}
-          value={input}
-          onChangeText={setInput}
-          placeholder="메시지를 입력하세요"
-          placeholderTextColor="#999"
-          selectionColor="#007AFF"
-          color="#000"
-        />
-        <TouchableOpacity onPress={handleSend} style={styles.sendButton}>
-          <Text style={{ color: "white" }}>전송</Text>
-        </TouchableOpacity>
+        <KeyboardAvoidingView
+          style={styles.container}
+          behavior={Platform.OS === "ios" ? "padding" : undefined}
+          keyboardVerticalOffset={10}
+        >
+          <FlatList
+            ref={flatListRef}
+            data={messages}
+            renderItem={({ item }) => (
+              <View
+                style={
+                  item.sender === "user" ? styles.userBubble : styles.aiBubble
+                }
+              >
+                <Text style={styles.bubbleText}>{item.text}</Text>
+              </View>
+            )}
+            keyExtractor={(_, index) => index.toString()}
+            contentContainerStyle={styles.chatContainer}
+          />
+
+          <View style={styles.inputContainer}>
+            <TextInput
+              style={styles.input}
+              value={input}
+              onChangeText={setInput}
+              placeholder="메시지를 입력하세요"
+              placeholderTextColor="#999"
+              selectionColor="#007AFF"
+              color="#000"
+              multiline
+            />
+            <TouchableOpacity onPress={handleSend} style={styles.sendButton}>
+              <Text style={{ color: "white" }}>전송</Text>
+            </TouchableOpacity>
+          </View>
+
+          <View style={styles.spacer} />
+        </KeyboardAvoidingView>
       </View>
-    </KeyboardAwareScrollView>
+    </TouchableWithoutFeedback>
   );
 }
 
 const styles = StyleSheet.create({
+  header: {
+    height: 60,
+    paddingHorizontal: 16,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    borderBottomWidth: 1,
+    borderColor: "#ccc",
+    backgroundColor: "black",
+  },
+  headerButton: {
+    padding: 10,
+  },
+  headerButtonText: {
+    fontSize: 20,
+    color: "white",
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: "bold",
+    color: "#000",
+  },
   container: {
     flex: 1,
     backgroundColor: "#fff",
   },
-  contentContainer: {
-    flexGrow: 1,
-    justifyContent: "space-between",
-    paddingTop: 50,
-    paddingHorizontal: 10,
-  },
   chatContainer: {
-    flex: 1,
+    padding: 10,
+    paddingBottom: 10,
   },
-  userText: {
+  spacer: {
+    height: 20,
+  },
+  userBubble: {
     alignSelf: "flex-end",
-    margin: 5,
-    backgroundColor: "#DCF8C6",
-    padding: 10,
-    borderRadius: 10,
+    backgroundColor: "#007AFF",
+    padding: 12,
+    marginVertical: 5,
+    borderRadius: 20,
+    borderBottomRightRadius: 0,
+    maxWidth: "80%",
   },
-  aiText: {
+  aiBubble: {
     alignSelf: "flex-start",
-    margin: 5,
-    backgroundColor: "#EEE",
-    padding: 10,
-    borderRadius: 10,
+    backgroundColor: "#ECECEC",
+    padding: 12,
+    marginVertical: 5,
+    borderRadius: 20,
+    borderBottomLeftRadius: 0,
+    maxWidth: "80%",
+  },
+  bubbleText: {
+    color: "#000",
+    fontSize: 16,
   },
   inputContainer: {
     flexDirection: "row",
     alignItems: "center",
-    marginTop: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 12,
+    borderTopWidth: 1,
+    borderColor: "#ccc",
+    backgroundColor: "#fff",
   },
   input: {
     flex: 1,
     borderColor: "#CCC",
     borderWidth: 1,
-    borderRadius: 10,
-    padding: 10,
+    borderRadius: 12,
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    fontSize: 16,
     backgroundColor: "#fff",
     color: "#000",
   },
   sendButton: {
     marginLeft: 10,
     backgroundColor: "#007AFF",
-    padding: 10,
-    borderRadius: 10,
+    paddingVertical: 14,
+    paddingHorizontal: 18,
+    borderRadius: 12,
   },
 });
