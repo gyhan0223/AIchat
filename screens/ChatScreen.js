@@ -18,6 +18,8 @@ import {
   View,
 } from "react-native";
 import { getMemories, saveMemory } from "../utils/memoryStore";
+import { extractTasks } from "../utils/taskExtractor";
+import { addTask } from "../utils/taskStore"; // 추가
 import { scheduleNotificationWithId } from "./HomeScreen";
 
 export default function ChatScreen() {
@@ -25,6 +27,7 @@ export default function ChatScreen() {
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [showSettings, setShowSettings] = useState(false);
+  const [extractedTasks, setExtractedTasks] = useState([]); // 디버깅용 상태
 
   const screenW = Dimensions.get("window").width;
   const slideAnim = useRef(new Animated.Value(screenW)).current;
@@ -57,6 +60,7 @@ export default function ChatScreen() {
     if (!input.trim()) return;
     const now = new Date().toISOString();
 
+    // 1) 유저 메시지 추가
     const userMessage = { sender: "user", text: input, timestamp: now };
     const updated = [...messages, userMessage];
     setMessages(updated);
@@ -64,6 +68,7 @@ export default function ChatScreen() {
     setInput("");
     flatListRef.current?.scrollToEnd({ animated: true });
 
+    // 2) AI 응답 가져오기
     const aiReply = await getAIResponse(input);
     const aiMessage = {
       sender: "ai",
@@ -75,7 +80,24 @@ export default function ChatScreen() {
     await AsyncStorage.setItem("chatMessages", JSON.stringify(final));
     flatListRef.current?.scrollToEnd({ animated: true });
 
-    const tasks = await extractTodayTasks(input);
+    // 3) 대화 전체를 넘겨서 할 일(extractTasks) 추출
+    try {
+      const tasks = await extractTasks(
+        final.map((m) => ({ sender: m.sender, text: m.text }))
+      );
+      console.log("추출된 Tasks:", tasks);
+      setExtractedTasks(tasks);
+
+      // 4) 추출된 각 태스크를 AsyncStorage에 저장
+      for (const task of tasks) {
+        await addTask(task);
+      }
+    } catch (e) {
+      console.warn("extractTasks 오류:", e);
+    }
+
+    // 5) 기존 메모리 저장 로직 유지
+    const tasksForToday = []; // extractTodayTasks(input) 대신 사용하지 않으므로 빈 배열
     const date = await extractDate(input);
     const time = await extractTime(input);
     const notifId = await scheduleNotificationWithId(input, date, time);
@@ -83,8 +105,8 @@ export default function ChatScreen() {
       user: input,
       ai: aiReply,
       timestamp: new Date().toISOString(),
-      type: tasks.length > 0 ? "todayTask" : "normal",
-      tasks,
+      type: tasksForToday.length > 0 ? "todayTask" : "normal",
+      tasks: tasksForToday,
       meta: date
         ? { date, time, event: "알 수 없음", notificationId: notifId }
         : undefined,
@@ -129,6 +151,7 @@ export default function ChatScreen() {
     }
   };
 
+  // 기존 스텁 함수들은 그대로 놔둡니다.
   const extractTodayTasks = async (text) => {
     /* ... */ return [];
   };
@@ -164,7 +187,6 @@ export default function ChatScreen() {
         behavior={Platform.OS === "ios" ? "padding" : "height"}
         keyboardVerticalOffset={30}
       >
-        {/* Removed TouchableWithoutFeedback wrapper to allow FlatList touch events */}
         <View style={{ flex: 1 }}>
           <View style={styles.header}>
             <TouchableOpacity onPress={() => navigation.goBack()}>
@@ -214,6 +236,21 @@ export default function ChatScreen() {
               keyboardDismissMode="on-drag"
               onScrollBeginDrag={Keyboard.dismiss}
             />
+
+            {/* ▼ 추출된 할 일 목록(디버그용) ▼ */}
+            <View
+              style={{ padding: 10, borderTopWidth: 1, borderColor: "#ccc" }}
+            >
+              <Text style={{ fontWeight: "bold" }}>💡 추출된 할 일 목록:</Text>
+              {extractedTasks.map((task) => (
+                <Text key={task.id} style={{ fontSize: 14, marginTop: 4 }}>
+                  • {task.content}{" "}
+                  {task.dueDate ? `(Due: ${task.dueDate})` : ""}
+                </Text>
+              ))}
+            </View>
+            {/* ▲ 추출된 할 일 목록(디버그용) ▲ */}
+
             <View style={styles.inputContainer}>
               <TextInput
                 style={styles.input}
@@ -229,6 +266,7 @@ export default function ChatScreen() {
               </TouchableOpacity>
             </View>
           </View>
+
           {showSettings && (
             <Animated.View
               style={[

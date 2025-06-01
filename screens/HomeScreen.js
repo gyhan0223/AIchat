@@ -1,300 +1,200 @@
-// ... import는 그대로 유지
-import AsyncStorage from "@react-native-async-storage/async-storage";
+// screens/HomeScreen.js
 import { useNavigation } from "@react-navigation/native";
 import * as Notifications from "expo-notifications";
-import React, { useEffect, useState } from "react";
+import { useEffect, useState } from "react";
 import {
-  Pressable,
+  Platform,
   ScrollView,
   StyleSheet,
   Text,
   TouchableOpacity,
   View,
 } from "react-native";
-import { getMemories, saveMemories } from "../utils/memoryStore";
-
-export const scheduleNotificationWithId = async (text, date, time) => {
-  if (!date || !time) return null;
-  const triggerDate = new Date(`${date}T${time}:00`);
-  const id = await Notifications.scheduleNotificationAsync({
-    content: {
-      title: "📌 약속 시간!",
-      body: `"${text}" 할 시간이야.`,
-    },
-    trigger: triggerDate,
-  });
-  return id;
-};
+import { SafeAreaView } from "react-native-safe-area-context";
+import { getMemories } from "../utils/memoryStore";
 
 export default function HomeScreen() {
+  const navigation = useNavigation();
   const [todayTasks, setTodayTasks] = useState([]);
-  const [taskCompletion, setTaskCompletion] = useState([]);
   const [futureEvents, setFutureEvents] = useState([]);
   const [worries, setWorries] = useState([]);
   const [emotions, setEmotions] = useState([]);
-  const [scheduled, setScheduled] = useState([]);
-  const navigation = useNavigation();
-
-  const loadMemories = async () => {
-    const memories = await getMemories();
-    const today = new Date().toISOString().split("T")[0];
-
-    const todayTasksList = [];
-    const futureEventsList = [];
-    const worriesList = [];
-    const emotionList = [];
-    const scheduledList = [];
-
-    memories.forEach((memory, index) => {
-      if (memory.type === "todayTask" && memory.timestamp.startsWith(today)) {
-        todayTasksList.push(...(memory.tasks || []));
-      }
-
-      if (memory.meta?.date > today) {
-        futureEventsList.push({
-          event: memory.meta?.event,
-          date: memory.meta?.date,
-        });
-      }
-
-      if (
-        memory.meta?.date &&
-        memory.meta?.time &&
-        memory.meta?.notificationId
-      ) {
-        scheduledList.push({
-          id: index,
-          notificationId: memory.meta.notificationId,
-          event: memory.meta?.event || memory.user,
-          date: memory.meta.date,
-          time: memory.meta.time,
-        });
-      }
-
-      if (
-        memory.user.includes("걱정") ||
-        memory.user.includes("불안") ||
-        memory.user.includes("스트레스")
-      ) {
-        worriesList.push(memory.user);
-      }
-
-      const emotionTags = ["우울", "불안", "슬픔", "짜증", "외로움", "무기력"];
-      if (emotionTags.some((tag) => memory.user.includes(tag))) {
-        const tag = emotionTags.find((t) => memory.user.includes(t));
-        if (tag) emotionList.push(tag);
-      }
-    });
-
-    setTodayTasks(todayTasksList);
-    setFutureEvents(futureEventsList);
-    setWorries(worriesList);
-    setEmotions(emotionList);
-    setScheduled(
-      scheduledList.sort(
-        (a, b) =>
-          new Date(`${a.date}T${a.time}`) - new Date(`${b.date}T${b.time}`)
-      )
-    );
-
-    const stored = await AsyncStorage.getItem("taskCompletion");
-    if (stored) {
-      const parsed = JSON.parse(stored);
-      setTaskCompletion(parsed);
-    } else {
-      setTaskCompletion(Array(todayTasksList.length).fill(false));
-    }
-  };
 
   useEffect(() => {
-    loadMemories();
+    (async () => {
+      const all = await getMemories();
+      const today = new Date().toISOString().split("T")[0];
+
+      // 오늘 일정
+      const todayList = all.filter(
+        (m) => m.type === "todayTask" && m.timestamp.startsWith(today)
+      );
+      setTodayTasks(todayList);
+
+      // 미래 이벤트
+      const futureList = all.filter((m) => m.meta?.date && m.meta.date > today);
+      setFutureEvents(futureList);
+
+      // 걱정거리
+      const worriesList = all.filter((m) => m.type === "worry");
+      setWorries(worriesList);
+
+      // 감정 요약
+      const emotionList = all.filter((m) => m.type === "emotion");
+      setEmotions(emotionList);
+    })();
   }, []);
 
-  const toggleTaskCompletion = async (index) => {
-    const updated = [...taskCompletion];
-    updated[index] = !updated[index];
-    setTaskCompletion(updated);
-    await AsyncStorage.setItem("taskCompletion", JSON.stringify(updated));
-  };
-
-  const deleteScheduledItem = async (index, notificationId) => {
-    const memories = await getMemories();
-    memories.splice(index, 1);
-    await saveMemories(memories);
-    if (notificationId) {
-      try {
-        await Notifications.cancelScheduledNotificationAsync(notificationId);
-      } catch (e) {
-        console.warn("알림 취소 실패:", e);
+  useEffect(() => {
+    const requestPermissionsAndCheckReminders = async () => {
+      const { status } = await Notifications.getPermissionsAsync();
+      if (status !== "granted") {
+        await Notifications.requestPermissionsAsync();
       }
-    }
-    await loadMemories();
-  };
-
-  const getCompletionRate = () => {
-    const total = taskCompletion.length;
-    const done = taskCompletion.filter(Boolean).length;
-    return total > 0 ? Math.round((done / total) * 100) : 0;
-  };
+    };
+    requestPermissionsAndCheckReminders();
+  }, []);
 
   return (
-    <ScrollView
-      style={styles.container}
-      contentContainerStyle={{ paddingBottom: 40 }}
-    >
-      <Text style={styles.heading}>오늘 해야 할 일 📝</Text>
-      {todayTasks.length > 0 ? (
-        todayTasks.map((task, idx) => (
-          <Pressable
-            key={idx}
-            onPress={() => toggleTaskCompletion(idx)}
-            style={styles.taskRow}
-          >
-            <View
-              style={[
-                styles.checkbox,
-                taskCompletion[idx] && styles.checkedBox,
-              ]}
-            />
-            <Text
-              style={[styles.item, taskCompletion[idx] && styles.checkedText]}
-            >
-              {task}
-            </Text>
-          </Pressable>
-        ))
-      ) : (
-        <Text style={styles.empty}>아직 저장된 할 일이 없어요.</Text>
-      )}
+    <SafeAreaView style={styles.container}>
+      <ScrollView contentContainerStyle={styles.content}>
+        {/* 오늘 할 일 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>오늘의 할 일</Text>
+          {todayTasks.length === 0 ? (
+            <Text style={styles.emptyText}>오늘 일정이 없습니다.</Text>
+          ) : (
+            todayTasks.map((m, idx) => (
+              <Text key={idx} style={styles.itemText}>
+                • {m.tasks.join(", ")}
+              </Text>
+            ))
+          )}
+        </View>
 
-      {todayTasks.length > 0 && (
-        <Text style={styles.completionMessage}>
-          🎉 오늘 할 일 완료율: {getCompletionRate()}%
-          {getCompletionRate() === 100
-            ? "! 완벽해! 👏"
-            : getCompletionRate() >= 50
-            ? " 잘하고 있어! 👍"
-            : " 조금만 더 힘내보자! 💪"}
-        </Text>
-      )}
+        {/* 미래 일정 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>미래 이벤트</Text>
+          {futureEvents.length === 0 ? (
+            <Text style={styles.emptyText}>등록된 미래 일정이 없습니다.</Text>
+          ) : (
+            futureEvents.map((m, idx) => (
+              <Text key={idx} style={styles.itemText}>
+                • {m.meta?.date} – {m.user}
+              </Text>
+            ))
+          )}
+        </View>
 
-      <Text style={styles.heading}>예정된 알림 ⏰</Text>
-      {scheduled.length > 0 ? (
-        scheduled.map((item, idx) => (
-          <View key={idx} style={styles.taskRow}>
-            <Text style={styles.item}>
-              - {item.event} ({item.date} {item.time})
-            </Text>
-            <TouchableOpacity
-              onPress={() => deleteScheduledItem(item.id, item.notificationId)}
-            >
-              <Text style={{ color: "red", marginLeft: 10 }}>❌</Text>
-            </TouchableOpacity>
-          </View>
-        ))
-      ) : (
-        <Text style={styles.empty}>예정된 알림이 없어요.</Text>
-      )}
+        {/* 걱정거리 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>걱정거리</Text>
+          {worries.length === 0 ? (
+            <Text style={styles.emptyText}>걱정거리가 없습니다.</Text>
+          ) : (
+            worries.map((m, idx) => (
+              <Text key={idx} style={styles.itemText}>
+                • {m.user}
+              </Text>
+            ))
+          )}
+        </View>
 
-      <Text style={styles.heading}>다가오는 일정 📅</Text>
-      {futureEvents.length > 0 ? (
-        futureEvents.map((event, idx) => (
-          <Text key={idx} style={styles.item}>
-            - {event.event} ({event.date})
-          </Text>
-        ))
-      ) : (
-        <Text style={styles.empty}>등록된 일정이 없어요.</Text>
-      )}
+        {/* 감정 요약 */}
+        <View style={styles.section}>
+          <Text style={styles.sectionTitle}>감정 요약</Text>
+          {emotions.length === 0 ? (
+            <Text style={styles.emptyText}>감정 기록이 없습니다.</Text>
+          ) : (
+            emotions.map((m, idx) => (
+              <Text key={idx} style={styles.itemText}>
+                • {m.ai}
+              </Text>
+            ))
+          )}
+        </View>
+      </ScrollView>
 
-      <Text style={styles.heading}>최근 걱정거리 😟</Text>
-      {worries.length > 0 ? (
-        worries.map((worry, idx) => (
-          <Text key={idx} style={styles.item}>
-            - {worry}
-          </Text>
-        ))
-      ) : (
-        <Text style={styles.empty}>최근 고민도 잘 없었네요 :)</Text>
-      )}
-
-      <Text style={styles.heading}>감정 요약 🧠</Text>
-      {emotions.length > 0 ? (
-        <Text style={styles.item}>
-          최근 자주 느낀 감정: {Array.from(new Set(emotions)).join(", ")}
-        </Text>
-      ) : (
-        <Text style={styles.empty}>감정 표현이 감지되지 않았어요.</Text>
-      )}
-
-      <TouchableOpacity
-        style={styles.button}
-        onPress={() => navigation.navigate("Chat")}
-      >
-        <Text style={styles.buttonText}>💬 대화하러 가기</Text>
-      </TouchableOpacity>
-    </ScrollView>
+      {/* 하단 네비게이션 버튼들 */}
+      <View style={styles.navContainer}>
+        <TouchableOpacity
+          style={styles.navButton}
+          onPress={() => navigation.navigate("Chat")}
+        >
+          <Text style={styles.navText}>💬 대화</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.navButton}
+          onPress={() => navigation.navigate("Tasks")}
+        >
+          <Text style={styles.navText}>📝 할 일 목록</Text>
+        </TouchableOpacity>
+        <TouchableOpacity
+          style={styles.navButton}
+          onPress={() => navigation.navigate("TaskDetail", { taskId: null })}
+        >
+          <Text style={styles.navText}>＋ 새 할 일</Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
   );
 }
 
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: "#fff",
-    paddingTop: 60,
-    paddingHorizontal: 20,
+  container: { flex: 1, backgroundColor: "#fff" },
+  content: {
+    padding: 16,
+    paddingBottom: Platform.OS === "ios" ? 140 : 120, // 버튼 공간 확보
   },
-  heading: {
-    fontSize: 20,
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 18,
     fontWeight: "bold",
-    marginTop: 20,
-    marginBottom: 10,
+    color: "#333",
+    marginBottom: 8,
   },
-  item: {
+  itemText: {
     fontSize: 16,
-    marginBottom: 5,
+    color: "#444",
+    marginBottom: 4,
   },
-  empty: {
-    fontSize: 15,
+  emptyText: {
+    fontSize: 14,
     color: "#999",
-    marginBottom: 10,
+    fontStyle: "italic",
   },
-  button: {
-    marginTop: 30,
-    backgroundColor: "#007AFF",
-    padding: 15,
+  navContainer: {
+    position: "absolute",
+    bottom: 30, // 더 위쪽으로 띄움
+    left: 16,
+    right: 16,
+    flexDirection: "row",
+    justifyContent: "space-between",
+    backgroundColor: "#fff",
+    paddingVertical: 16, // 버튼 높이 확장
+    borderTopWidth: 1,
+    borderColor: "#eee",
     borderRadius: 12,
+    // 그림자 효과
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  navButton: {
+    flex: 1,
+    marginHorizontal: 6,
+    backgroundColor: "#007AFF",
+    paddingVertical: 14, // 버튼 높이 확장
+    borderRadius: 8,
     alignItems: "center",
   },
-  buttonText: {
+  navText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
-  },
-  taskRow: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
-  },
-  checkbox: {
-    width: 20,
-    height: 20,
-    borderWidth: 1,
-    borderColor: "#007AFF",
-    marginRight: 10,
-    borderRadius: 4,
-  },
-  checkedBox: {
-    backgroundColor: "#007AFF",
-  },
-  checkedText: {
-    textDecorationLine: "line-through",
-    color: "#999",
-  },
-  completionMessage: {
-    fontSize: 16,
-    marginTop: 5,
-    marginBottom: 10,
-    color: "#444",
   },
 });

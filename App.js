@@ -4,10 +4,13 @@ import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import * as Notifications from "expo-notifications";
 import { useEffect } from "react";
 import { StatusBar } from "react-native";
+import { GestureHandlerRootView } from "react-native-gesture-handler"; // 추가
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
 import ChatScreen from "./screens/ChatScreen";
 import HomeScreen from "./screens/HomeScreen";
+import TaskDetailScreen from "./screens/TaskDetailScreen";
+import TaskListScreen from "./screens/TaskListScreen";
 import { getMemories } from "./utils/memoryStore";
 
 const Stack = createNativeStackNavigator();
@@ -40,22 +43,25 @@ export default function App() {
   }, []);
 
   return (
-    <SafeAreaProvider>
-      {/* 상태바 검은 배경＋흰 글씨 */}
-      <StatusBar
-        backgroundColor="black"
-        barStyle="light-content"
-        translucent={false}
-      />
-      <NavigationContainer>
-        <Stack.Navigator
-          initialRouteName="Home"
-          screenOptions={{ headerShown: false }}
-        >
-          <Stack.Screen name="Home" component={HomeScreen} />
-          <Stack.Screen name="Chat" component={ChatScreen} />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </SafeAreaProvider>
+    <GestureHandlerRootView style={{ flex: 1 }}>
+      <SafeAreaProvider>
+        <StatusBar
+          backgroundColor="black"
+          barStyle="light-content"
+          translucent={false}
+        />
+        <NavigationContainer>
+          <Stack.Navigator
+            initialRouteName="Home"
+            screenOptions={{ headerShown: false }}
+          >
+            <Stack.Screen name="Home" component={HomeScreen} />
+            <Stack.Screen name="Chat" component={ChatScreen} />
+            <Stack.Screen name="Tasks" component={TaskListScreen} />
+            <Stack.Screen name="TaskDetail" component={TaskDetailScreen} />
+          </Stack.Navigator>
+        </NavigationContainer>
+      </SafeAreaProvider>
+    </GestureHandlerRootView>
   );
 }
