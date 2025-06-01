@@ -1,8 +1,9 @@
 import { OPENAI_API_KEY } from "@env";
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useNavigation } from "@react-navigation/native";
+import { useNavigation, useRoute } from "@react-navigation/native";
 import { useEffect, useRef, useState } from "react";
 import {
+  Alert,
   Animated,
   Dimensions,
   FlatList,
@@ -19,26 +20,50 @@ import {
 } from "react-native";
 import { getMemories, saveMemory } from "../utils/memoryStore";
 import { extractTasks } from "../utils/taskExtractor";
-import { addTask } from "../utils/taskStore"; // 추가
+import { addTask } from "../utils/taskStore";
 import { scheduleNotificationWithId } from "./HomeScreen";
 
 export default function ChatScreen() {
   const navigation = useNavigation();
+  const route = useRoute();
+  const { sessionId } = route.params;
+
   const [messages, setMessages] = useState([]);
   const [input, setInput] = useState("");
   const [showSettings, setShowSettings] = useState(false);
-  const [extractedTasks, setExtractedTasks] = useState([]); // 디버깅용 상태
+  const [extractedTasks, setExtractedTasks] = useState([]);
 
   const screenW = Dimensions.get("window").width;
   const slideAnim = useRef(new Animated.Value(screenW)).current;
   const flatListRef = useRef();
 
+  const [sessionTitle, setSessionTitle] = useState("");
+
   useEffect(() => {
     (async () => {
-      const saved = await AsyncStorage.getItem("chatMessages");
-      if (saved) setMessages(JSON.parse(saved));
-    })();
-    (async () => {
+      const saved = await AsyncStorage.getItem(`chatMessages:${sessionId}`);
+      let msgs = saved ? JSON.parse(saved) : [];
+
+      const sessionsJson = await AsyncStorage.getItem("chatSessions");
+      if (sessionsJson) {
+        const sessions = JSON.parse(sessionsJson);
+        const target = sessions.find((s) => s.id === sessionId);
+        if (target) setSessionTitle(target.title);
+      }
+
+      if (msgs.length === 0) {
+        const welcomeText = "안녕! 만나서 반가워. 너 이름이 뭐야?";
+        const now = new Date().toISOString();
+        const aiMsg = { sender: "ai", text: welcomeText, timestamp: now };
+        msgs = [aiMsg];
+        await AsyncStorage.setItem(
+          `chatMessages:${sessionId}`,
+          JSON.stringify(msgs)
+        );
+      }
+
+      setMessages(msgs);
+
       const all = await getMemories();
       const today = new Date().toISOString().split("T")[0];
       all.forEach((m) => {
@@ -54,21 +79,37 @@ export default function ChatScreen() {
         }
       });
     })();
-  }, []);
+  }, [sessionId]);
 
   const handleSend = async () => {
     if (!input.trim()) return;
     const now = new Date().toISOString();
 
-    // 1) 유저 메시지 추가
+    if (sessionTitle === "새 대화") {
+      const newTitle =
+        input.length > 20 ? input.slice(0, 20).trim() + "…" : input.trim();
+      setSessionTitle(newTitle);
+
+      const json = await AsyncStorage.getItem("chatSessions");
+      if (json) {
+        const sessions = JSON.parse(json);
+        const updated = sessions.map((s) =>
+          s.id === sessionId ? { ...s, title: newTitle } : s
+        );
+        await AsyncStorage.setItem("chatSessions", JSON.stringify(updated));
+      }
+    }
+
     const userMessage = { sender: "user", text: input, timestamp: now };
     const updated = [...messages, userMessage];
     setMessages(updated);
-    await AsyncStorage.setItem("chatMessages", JSON.stringify(updated));
+    await AsyncStorage.setItem(
+      `chatMessages:${sessionId}`,
+      JSON.stringify(updated)
+    );
     setInput("");
     flatListRef.current?.scrollToEnd({ animated: true });
 
-    // 2) AI 응답 가져오기
     const aiReply = await getAIResponse(input);
     const aiMessage = {
       sender: "ai",
@@ -77,27 +118,27 @@ export default function ChatScreen() {
     };
     const final = [...updated, aiMessage];
     setMessages(final);
-    await AsyncStorage.setItem("chatMessages", JSON.stringify(final));
+    await AsyncStorage.setItem(
+      `chatMessages:${sessionId}`,
+      JSON.stringify(final)
+    );
     flatListRef.current?.scrollToEnd({ animated: true });
 
-    // 3) 대화 전체를 넘겨서 할 일(extractTasks) 추출
     try {
       const tasks = await extractTasks(
         final.map((m) => ({ sender: m.sender, text: m.text }))
       );
-      console.log("추출된 Tasks:", tasks);
-      setExtractedTasks(tasks);
-
-      // 4) 추출된 각 태스크를 AsyncStorage에 저장
-      for (const task of tasks) {
-        await addTask(task);
+      if (tasks.length > 0) {
+        setExtractedTasks(tasks);
+        for (const task of tasks) {
+          await addTask(task);
+        }
       }
     } catch (e) {
       console.warn("extractTasks 오류:", e);
     }
 
-    // 5) 기존 메모리 저장 로직 유지
-    const tasksForToday = []; // extractTodayTasks(input) 대신 사용하지 않으므로 빈 배열
+    const tasksForToday = [];
     const date = await extractDate(input);
     const time = await extractTime(input);
     const notifId = await scheduleNotificationWithId(input, date, time);
@@ -129,6 +170,22 @@ export default function ChatScreen() {
         { role: "user", content: m.user },
         { role: "assistant", content: m.ai },
       ]);
+
+      const systemPrompt = `
+        너는 사용자의 ‘친근한 전문 코치’야.
+        언제나 편하게 구어체로 말하면서,
+        다음과 같은 방식으로 답해 줘:
+
+        1) 짧게 먼저 격려나 맞장구를 건네듯 시작한다. (예: "와, 멋진 목표야!", "좋아, 한번 해보자!")
+        2) 그 뒤에는 반드시 “구조화된 단계(step)” 형태로 설명한다. (예: “첫째, ~; 둘째, ~; 셋째, ~”)
+        3) 각 단계마다 구체적인 팁이나 주의사항을 덧붙인다. (예: “이렇게 하면 좋아요”, “이 부분을 신경써 주세요”)
+        4) 너무 길게 늘어놓지 말고, 3~4단계 내외로 간결하게 작성한다.
+        5) 구어체 어투를 유지하되, 부드러운 표현을 섞어준다.
+
+        예시:
+        "첫째, 오늘 할 일 목록을 노트에 적어봐. 이렇게 하면 머릿속이 정리돼. 둘째, 중요한 일부터 순서대로 타이머를 25분으로 맞추고 집중해. 셋째, 5분 휴식 타임을 꼭 가져. 요렇게 하면 효율이 확 올라갈 거야!"
+      `;
+
       const res = await fetch("https://api.openai.com/v1/chat/completions", {
         method: "POST",
         headers: {
@@ -138,7 +195,7 @@ export default function ChatScreen() {
         body: JSON.stringify({
           model: "gpt-3.5-turbo",
           messages: [
-            { role: "system", content: "너는 현실적인 조언을 해주는 AI야." },
+            { role: "system", content: systemPrompt },
             ...recent,
             { role: "user", content: text },
           ],
@@ -151,7 +208,6 @@ export default function ChatScreen() {
     }
   };
 
-  // 기존 스텁 함수들은 그대로 놔둡니다.
   const extractTodayTasks = async (text) => {
     /* ... */ return [];
   };
@@ -179,6 +235,18 @@ export default function ChatScreen() {
     }
   };
 
+  const onTasksPress = () => {
+    const list = extractedTasks
+      .map((t) => `• ${t.content}${t.dueDate ? ` (Due: ${t.dueDate})` : ""}`)
+      .join("\n");
+    Alert.alert("추출된 할 일 목록", list, [
+      {
+        text: "확인",
+        onPress: () => setExtractedTasks([]),
+      },
+    ]);
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: "#fff" }}>
       <StatusBar backgroundColor="black" barStyle="light-content" />
@@ -192,7 +260,7 @@ export default function ChatScreen() {
             <TouchableOpacity onPress={() => navigation.goBack()}>
               <Text style={styles.headerButtonText}>←</Text>
             </TouchableOpacity>
-            <Text style={styles.headerTitle}>대화</Text>
+            <Text style={styles.headerTitle}>{sessionTitle}</Text>
             <TouchableOpacity onPress={toggleSettings}>
               <Text style={styles.headerButtonText}>☰</Text>
             </TouchableOpacity>
@@ -202,9 +270,13 @@ export default function ChatScreen() {
               style={{ flex: 1 }}
               ref={flatListRef}
               data={messages}
-              renderItem={({ item }) => {
+              renderItem={({ item, index }) => {
                 const isUser = item.sender === "user";
                 const timeStr = formatTime(item.timestamp);
+                const isLastAI =
+                  !isUser &&
+                  index === messages.length - 1 &&
+                  extractedTasks.length > 0;
                 return (
                   <View
                     style={[
@@ -220,12 +292,22 @@ export default function ChatScreen() {
                         </View>
                       </>
                     ) : (
-                      <>
+                      <View style={{ width: "100%" }}>
                         <View style={styles.aiBubble}>
                           <Text style={styles.bubbleText}>{item.text}</Text>
                         </View>
                         <Text style={styles.timeText}>{timeStr}</Text>
-                      </>
+                        {isLastAI && (
+                          <TouchableOpacity
+                            onPress={onTasksPress}
+                            style={styles.taskNoticeContainer}
+                          >
+                            <Text style={styles.taskNoticeText}>
+                              📝 할 일이 감지되었습니다. 확인하기
+                            </Text>
+                          </TouchableOpacity>
+                        )}
+                      </View>
                     )}
                   </View>
                 );
@@ -236,20 +318,6 @@ export default function ChatScreen() {
               keyboardDismissMode="on-drag"
               onScrollBeginDrag={Keyboard.dismiss}
             />
-
-            {/* ▼ 추출된 할 일 목록(디버그용) ▼ */}
-            <View
-              style={{ padding: 10, borderTopWidth: 1, borderColor: "#ccc" }}
-            >
-              <Text style={{ fontWeight: "bold" }}>💡 추출된 할 일 목록:</Text>
-              {extractedTasks.map((task) => (
-                <Text key={task.id} style={{ fontSize: 14, marginTop: 4 }}>
-                  • {task.content}{" "}
-                  {task.dueDate ? `(Due: ${task.dueDate})` : ""}
-                </Text>
-              ))}
-            </View>
-            {/* ▲ 추출된 할 일 목록(디버그용) ▲ */}
 
             <View style={styles.inputContainer}>
               <TextInput
@@ -299,7 +367,11 @@ const styles = StyleSheet.create({
   headerTitle: { fontSize: 18, fontWeight: "bold", color: "white" },
   container: { flex: 1, backgroundColor: "#fff" },
   chatContainer: { padding: 10, paddingBottom: 10 },
-  messageRow: { flexDirection: "row", alignItems: "center", marginVertical: 4 },
+  messageRow: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginVertical: 4,
+  },
   userRow: { justifyContent: "flex-end" },
   aiRow: { justifyContent: "flex-start" },
   timeText: { fontSize: 12, color: "#999", marginHorizontal: 6 },
@@ -343,6 +415,15 @@ const styles = StyleSheet.create({
     maxWidth: "80%",
   },
   bubbleText: { color: "#000", fontSize: 16 },
+  taskNoticeContainer: {
+    marginTop: 4,
+    marginLeft: 8,
+  },
+  taskNoticeText: {
+    fontSize: 14,
+    color: "#007AFF",
+    textDecorationLine: "underline",
+  },
   settingsPanel: {
     position: "absolute",
     top: 60,

@@ -7,6 +7,7 @@ import { StatusBar } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler"; // 추가
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
+import ChatListScreen from "./screens/ChatListScreen";
 import ChatScreen from "./screens/ChatScreen";
 import HomeScreen from "./screens/HomeScreen";
 import TaskDetailScreen from "./screens/TaskDetailScreen";
@@ -57,6 +58,7 @@ export default function App() {
           >
             <Stack.Screen name="Home" component={HomeScreen} />
             <Stack.Screen name="Chat" component={ChatScreen} />
+            <Stack.Screen name="ChatList" component={ChatListScreen} />
             <Stack.Screen name="Tasks" component={TaskListScreen} />
             <Stack.Screen name="TaskDetail" component={TaskDetailScreen} />
           </Stack.Navigator>

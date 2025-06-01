@@ -119,7 +119,7 @@ export default function HomeScreen() {
       <View style={styles.navContainer}>
         <TouchableOpacity
           style={styles.navButton}
-          onPress={() => navigation.navigate("Chat")}
+          onPress={() => navigation.navigate("ChatList")}
         >
           <Text style={styles.navText}>💬 대화</Text>
         </TouchableOpacity>
