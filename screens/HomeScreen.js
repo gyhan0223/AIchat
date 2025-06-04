@@ -1,8 +1,10 @@
 // screens/HomeScreen.js
-import { useNavigation } from "@react-navigation/native";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import * as Notifications from "expo-notifications";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import {
+  Alert,
   Platform,
   ScrollView,
   StyleSheet,
@@ -15,10 +17,23 @@ import { getMemories } from "../utils/memoryStore";
 
 export default function HomeScreen() {
   const navigation = useNavigation();
+  const [userName, setUserName] = useState("");
   const [todayTasks, setTodayTasks] = useState([]);
   const [futureEvents, setFutureEvents] = useState([]);
   const [worries, setWorries] = useState([]);
   const [emotions, setEmotions] = useState([]);
+
+  // 화면 포커스 시마다 userName 갱신
+  useFocusEffect(
+    useCallback(() => {
+      (async () => {
+        const storedName = await AsyncStorage.getItem("userName");
+        if (storedName) {
+          setUserName(storedName);
+        }
+      })();
+    }, [])
+  );
 
   useEffect(() => {
     (async () => {
@@ -55,9 +70,37 @@ export default function HomeScreen() {
     requestPermissionsAndCheckReminders();
   }, []);
 
+  // AI가 기억 중인 사용자 정보 보기
+  const viewUserInfo = async () => {
+    const storedName = await AsyncStorage.getItem("userName");
+    const memories = await getMemories();
+    let infoText = "";
+
+    // 이름
+    infoText += storedName ? `이름: ${storedName}\n\n` : "";
+
+    // 메모리 항목들
+    if (memories.length === 0) {
+      infoText += "기억된 정보가 없습니다.";
+    } else {
+      infoText += "저장된 기억:\n";
+      memories.forEach((m, idx) => {
+        const time = m.timestamp.split("T")[0];
+        infoText += `${idx + 1}. [${m.type}] ${time} - "${m.user}"\n`;
+      });
+    }
+
+    Alert.alert("AI가 기억 중인 정보", infoText);
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <ScrollView contentContainerStyle={styles.content}>
+        {/* 사용자 인사말 */}
+        {userName ? (
+          <Text style={styles.greeting}>{`${userName}님, 반가워요!`}</Text>
+        ) : null}
+
         {/* 오늘 할 일 */}
         <View style={styles.section}>
           <Text style={styles.sectionTitle}>오늘의 할 일</Text>
@@ -115,6 +158,11 @@ export default function HomeScreen() {
         </View>
       </ScrollView>
 
+      {/* 사용자 정보 보기 버튼 */}
+      <TouchableOpacity style={styles.infoButton} onPress={viewUserInfo}>
+        <Text style={styles.infoButtonText}>내 정보 보기</Text>
+      </TouchableOpacity>
+
       {/* 하단 네비게이션 버튼들 */}
       <View style={styles.navContainer}>
         <TouchableOpacity
@@ -144,7 +192,13 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   content: {
     padding: 16,
-    paddingBottom: Platform.OS === "ios" ? 140 : 120, // 버튼 공간 확보
+    paddingBottom: Platform.OS === "ios" ? 180 : 160, // 버튼 공간 추가 확보
+  },
+  greeting: {
+    fontSize: 20,
+    fontWeight: "bold",
+    color: "#007AFF",
+    marginBottom: 16,
   },
   section: {
     marginBottom: 24,
@@ -165,19 +219,34 @@ const styles = StyleSheet.create({
     color: "#999",
     fontStyle: "italic",
   },
+  infoButton: {
+    position: "absolute",
+    bottom: 100, // 네비게이션 버튼 위에 위치
+    left: 16,
+    right: 16,
+    backgroundColor: "#28a745",
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: "center",
+    marginHorizontal: 6,
+  },
+  infoButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
   navContainer: {
     position: "absolute",
-    bottom: 30, // 더 위쪽으로 띄움
+    bottom: 30,
     left: 16,
     right: 16,
     flexDirection: "row",
     justifyContent: "space-between",
     backgroundColor: "#fff",
-    paddingVertical: 16, // 버튼 높이 확장
+    paddingVertical: 16,
     borderTopWidth: 1,
     borderColor: "#eee",
     borderRadius: 12,
-    // 그림자 효과
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
@@ -188,7 +257,7 @@ const styles = StyleSheet.create({
     flex: 1,
     marginHorizontal: 6,
     backgroundColor: "#007AFF",
-    paddingVertical: 14, // 버튼 높이 확장
+    paddingVertical: 14,
     borderRadius: 8,
     alignItems: "center",
   },

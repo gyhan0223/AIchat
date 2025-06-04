@@ -1,57 +1,86 @@
 import { OPENAI_API_KEY } from "@env";
 
-/**
- * Chat 기록에서 할 일을 자동 추출하는 함수
- * @param {{ sender: 'user' | 'assistant', text: string }[]} chatHistory
- * @returns {Promise<{ id: string; content: string; dueDate?: string; priority?: string; }[]>}
- */
-export async function extractTasks(chatHistory) {
-  // 시스템 메시지: 할 일을 JSON 형식으로만 반환하도록 지시
-  const systemPrompt = `너는 유저의 대화에서 "할 일"만 추출하는 역할이야.
-출력 형식은 JSON 배열이고, 각 아이템은 다음 속성을 가져야 해:
-- id: 고유 식별자 (uuid 형태)
-- content: 할 일 내용(문장)
-- dueDate: 사용자가 언급한 예정일(없으면 omit)
-- priority: 우선순위(high, medium, low; 언급 없으면 medium)
+export async function extractTasks(conversation) {
+  /**
+   * conversation: [{ sender: "user"|"ai", text: "..." }, ... ]
+   * 최종적으로 [{ id: "1", content: "할 일 내용", dueDate: "YYYY-MM-DD" }, ...] 형태의 배열을 반환해야 함
+   */
+  // 1) 대화 전체를 문자열 형태로 합치기
+  const history = conversation
+    .map((m) => `${m.sender === "user" ? "User" : "AI"}: ${m.text}`)
+    .join("\n");
 
-예시:
+  // 2) AI에게 JSON 배열 형태로만 응답 요청
+  const systemPrompt = `
+너는 이제 아래 대화 내용에서 사용자의 할 일을 찾아서,
+반드시 **순수 JSON 배열**만 반환해야 해. (절대로 다른 설명을 덧붙이지 마.)
+
+각 할 일 객체는 다음 필드를 가져야 해:
+- id: 유니크 식별자 (예: "1", "2", "3" …)
+- content: 할 일 문장 (예: "옷걸이 사기")
+- dueDate: 만약 마감일이 있으면 "YYYY-MM-DD" 형태, 없으면 빈 문자열
+
+예시 응답 형식 (아래 반드시 따르기):
 [
-  { "id": "1", "content": "내일 아침 9시에 프로젝트 회의 준비", "dueDate": "2025-06-01", "priority": "high" },
-  { "id": "2", "content": "팀원에게 피드백 공유", "priority": "medium" }
-]`;
+  {
+    "id": "1",
+    "content": "옷걸이 사기",
+    "dueDate": "2025-06-05"
+  },
+  {
+    "id": "2",
+    "content": "내일 회의 준비",
+    "dueDate": ""
+  }
+]
 
-  // OpenAI Chat API 호출용 메시지 구성
-  const messages = [
-    { role: "system", content: systemPrompt },
-    ...chatHistory.map((m) => ({
-      role: m.sender === "user" ? "user" : "assistant",
-      content: m.text,
-    })),
-  ];
-
-  // API 요청
-  const response = await fetch("https://api.openai.com/v1/chat/completions", {
-    method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${OPENAI_API_KEY}`,
-    },
-    body: JSON.stringify({
-      model: "gpt-3.5-turbo",
-      messages,
-      temperature: 0,
-    }),
-  });
-
-  const json = await response.json();
-  const text = json.choices[0].message.content;
+어떤 이유로도 JSON 배열 바깥에 텍스트(“Here are your tasks…”, “할 일이 없습니다” 등)를 넣지 말고,
+딱 JSON 배열만 순수하게 응답해야 해.
+`;
 
   try {
-    // JSON 파싱
-    const tasks = JSON.parse(text);
-    return tasks;
-  } catch (e) {
-    console.error("extractTasks: JSON 파싱 오류", e, text);
-    throw new Error("할 일 추출 중 오류가 발생했습니다.");
+    const res = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${OPENAI_API_KEY}`,
+      },
+      body: JSON.stringify({
+        model: "gpt-3.5-turbo",
+        messages: [
+          { role: "system", content: systemPrompt },
+          { role: "user", content: history },
+        ],
+        temperature: 0.0,
+      }),
+    });
+
+    const data = await res.json();
+    const text = data.choices?.[0]?.message?.content?.trim() || "";
+
+    // 3) 파싱 단계: JSON.parse가 실패하면 빈 배열 반환
+    try {
+      const tasks = JSON.parse(text);
+      // 형식 검증: 배열이어야 하고, 각 항목에 필수 키(id, content, dueDate)가 존재해야 함
+      if (Array.isArray(tasks)) {
+        return tasks.map((t, i) => {
+          return {
+            id: t.id?.toString() || `${i + 1}`,
+            content: t.content || "",
+            dueDate: t.dueDate || "",
+          };
+        });
+      } else {
+        // JSON은 배열 형식이지만, 배열이 아닌 경우
+        console.warn("extractTasks: JSON 형태는 배열이지만, 배열이 아님", text);
+        return [];
+      }
+    } catch (parseErr) {
+      console.warn("extractTasks: JSON 파싱 오류", parseErr, text);
+      return [];
+    }
+  } catch (err) {
+    console.warn("extractTasks 오류:", err);
+    return [];
   }
 }

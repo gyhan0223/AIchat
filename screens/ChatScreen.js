@@ -32,18 +32,27 @@ export default function ChatScreen() {
   const [input, setInput] = useState("");
   const [showSettings, setShowSettings] = useState(false);
   const [extractedTasks, setExtractedTasks] = useState([]);
+  const [sessionTitle, setSessionTitle] = useState("");
+  const [nameStored, setNameStored] = useState(false);
 
   const screenW = Dimensions.get("window").width;
   const slideAnim = useRef(new Animated.Value(screenW)).current;
   const flatListRef = useRef();
 
-  const [sessionTitle, setSessionTitle] = useState("");
-
   useEffect(() => {
     (async () => {
+      // 저장된 사용자 이름 로드
+      const storedName = await AsyncStorage.getItem("userName");
+      if (storedName) {
+        setNameStored(true);
+        setSessionTitle(storedName);
+      }
+
+      // 해당 세션 메시지 불러오기
       const saved = await AsyncStorage.getItem(`chatMessages:${sessionId}`);
       let msgs = saved ? JSON.parse(saved) : [];
 
+      // 세션 제목 로드
       const sessionsJson = await AsyncStorage.getItem("chatSessions");
       if (sessionsJson) {
         const sessions = JSON.parse(sessionsJson);
@@ -51,6 +60,7 @@ export default function ChatScreen() {
         if (target) setSessionTitle(target.title);
       }
 
+      // 새 세션이라면 AI가 이름을 물어보는 초기 메시지 추가
       if (msgs.length === 0) {
         const welcomeText = "안녕! 만나서 반가워. 너 이름이 뭐야?";
         const now = new Date().toISOString();
@@ -64,6 +74,7 @@ export default function ChatScreen() {
 
       setMessages(msgs);
 
+      // 기존 메모리 기반 오늘 할 일 알림
       const all = await getMemories();
       const today = new Date().toISOString().split("T")[0];
       all.forEach((m) => {
@@ -85,21 +96,25 @@ export default function ChatScreen() {
     if (!input.trim()) return;
     const now = new Date().toISOString();
 
-    if (sessionTitle === "새 대화") {
-      const newTitle =
-        input.length > 20 ? input.slice(0, 20).trim() + "…" : input.trim();
-      setSessionTitle(newTitle);
+    // 첫 메시지 이후, 이름이 아직 저장되지 않았다면 사용자 입력을 이름으로 저장
+    if (!nameStored && messages.length >= 1 && messages[0].sender === "ai") {
+      const userName = input.trim();
+      await AsyncStorage.setItem("userName", userName);
+      setNameStored(true);
+      setSessionTitle(userName);
 
-      const json = await AsyncStorage.getItem("chatSessions");
-      if (json) {
-        const sessions = JSON.parse(json);
+      // 세션 제목도 사용자 이름으로 업데이트
+      const sessionsJson = await AsyncStorage.getItem("chatSessions");
+      if (sessionsJson) {
+        const sessions = JSON.parse(sessionsJson);
         const updated = sessions.map((s) =>
-          s.id === sessionId ? { ...s, title: newTitle } : s
+          s.id === sessionId ? { ...s, title: userName } : s
         );
         await AsyncStorage.setItem("chatSessions", JSON.stringify(updated));
       }
     }
 
+    // 유저 메시지 추가
     const userMessage = { sender: "user", text: input, timestamp: now };
     const updated = [...messages, userMessage];
     setMessages(updated);
@@ -110,6 +125,7 @@ export default function ChatScreen() {
     setInput("");
     flatListRef.current?.scrollToEnd({ animated: true });
 
+    // AI 응답
     const aiReply = await getAIResponse(input);
     const aiMessage = {
       sender: "ai",
@@ -124,6 +140,7 @@ export default function ChatScreen() {
     );
     flatListRef.current?.scrollToEnd({ animated: true });
 
+    // 할 일 추출
     try {
       const tasks = await extractTasks(
         final.map((m) => ({ sender: m.sender, text: m.text }))
@@ -138,6 +155,7 @@ export default function ChatScreen() {
       console.warn("extractTasks 오류:", e);
     }
 
+    // 메모리 저장
     const tasksForToday = [];
     const date = await extractDate(input);
     const time = await extractTime(input);
@@ -273,6 +291,7 @@ export default function ChatScreen() {
               renderItem={({ item, index }) => {
                 const isUser = item.sender === "user";
                 const timeStr = formatTime(item.timestamp);
+                const isNameAskAI = index === 0 && item.sender === "ai";
                 const isLastAI =
                   !isUser &&
                   index === messages.length - 1 &&
@@ -297,6 +316,17 @@ export default function ChatScreen() {
                           <Text style={styles.bubbleText}>{item.text}</Text>
                         </View>
                         <Text style={styles.timeText}>{timeStr}</Text>
+
+                        {/* 이름 물어보는 AI 메시지 아래에 이름 저장 알림 */}
+                        {isNameAskAI && nameStored && (
+                          <View style={styles.nameConfirmContainer}>
+                            <Text style={styles.nameConfirmText}>
+                              🎉 AI가 사용자의 이름을 기억했습니다!
+                            </Text>
+                          </View>
+                        )}
+
+                        {/* 마지막 AI 메시지 아래에 할 일 알림 */}
                         {isLastAI && (
                           <TouchableOpacity
                             onPress={onTasksPress}
@@ -415,6 +445,14 @@ const styles = StyleSheet.create({
     maxWidth: "80%",
   },
   bubbleText: { color: "#000", fontSize: 16 },
+  nameConfirmContainer: {
+    marginTop: 4,
+    marginLeft: 8,
+  },
+  nameConfirmText: {
+    fontSize: 14,
+    color: "#28a745",
+  },
   taskNoticeContainer: {
     marginTop: 4,
     marginLeft: 8,
