@@ -13,12 +13,19 @@ import {
 } from "react-native";
 import { RectButton, Swipeable } from "react-native-gesture-handler";
 import { SafeAreaView } from "react-native-safe-area-context"; // SafeAreaView 추가
-import { deleteTask, getAllTasks, updateTask } from "../utils/taskStore";
+import {
+  deleteTask,
+  deleteTasks,
+  getAllTasks,
+  updateTask,
+} from "../utils/taskStore";
 
 export default function TaskListScreen() {
   const navigation = useNavigation();
   const [tasks, setTasks] = useState([]);
   const [filter, setFilter] = useState("all"); // 'all' | 'today' | 'completed'
+  const [selectMode, setSelectMode] = useState(false);
+  const [selected, setSelected] = useState(new Set());
 
   // 오늘 날짜 문자열: '2025-06-01' 같은 형식
   const todayString = new Date().toISOString().split("T")[0];
@@ -33,6 +40,53 @@ export default function TaskListScreen() {
   const loadTasks = async () => {
     const all = await getAllTasks();
     setTasks(all);
+  };
+
+  const toggleSelectMode = () => {
+    if (selectMode) {
+      setSelected(new Set());
+    }
+    setSelectMode(!selectMode);
+  };
+
+  const toggleSelect = (id) => {
+    const newSet = new Set(selected);
+    if (newSet.has(id)) {
+      newSet.delete(id);
+    } else {
+      newSet.add(id);
+    }
+    setSelected(newSet);
+  };
+
+  const toggleSelectAll = () => {
+    if (selected.size === filteredTasks.length) {
+      setSelected(new Set());
+    } else {
+      setSelected(new Set(filteredTasks.map((t) => t.id)));
+    }
+  };
+
+  const deleteSelectedTasks = () => {
+    const ids = Array.from(selected);
+    if (ids.length === 0) return;
+    Alert.alert(
+      "정말 삭제하시겠습니까?",
+      `${ids.length}개 할 일을 삭제합니다.`,
+      [
+        { text: "취소", style: "cancel" },
+        {
+          text: "삭제",
+          style: "destructive",
+          onPress: async () => {
+            await deleteTasks(ids);
+            setSelected(new Set());
+            setSelectMode(false);
+            loadTasks();
+          },
+        },
+      ]
+    );
   };
 
   // 필터링된 목록 계산
@@ -94,6 +148,39 @@ export default function TaskListScreen() {
 
   // 각 태스크 행 렌더링
   const renderItem = ({ item }) => {
+    if (selectMode) {
+      const checked = selected.has(item.id);
+      return (
+        <TouchableOpacity
+          style={[styles.taskRow, styles.selectItem]}
+          onPress={() => toggleSelect(item.id)}
+        >
+          <View style={styles.checkbox}>
+            {checked && <Text style={styles.checkmark}>✓</Text>}
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text
+              style={[
+                styles.taskContent,
+                item.completed && styles.completedText,
+              ]}
+            >
+              {item.content}
+            </Text>
+            {item.dueDate && (
+              <Text style={styles.dueDate}>
+                마감: {format(new Date(item.dueDate), "yyyy-MM-dd")}
+              </Text>
+            )}
+          </View>
+          {item.priority && (
+            <View style={styles.priorityBadge(item.priority)}>
+              <Text style={styles.priorityText}>{item.priority}</Text>
+            </View>
+          )}
+        </TouchableOpacity>
+      );
+    }
     return (
       <Swipeable
         renderLeftActions={() => renderLeftActions(item)}
@@ -132,6 +219,25 @@ export default function TaskListScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
+      {selectMode && (
+        <View style={styles.bulkActions}>
+          <TouchableOpacity onPress={toggleSelectAll} style={styles.bulkButton}>
+            <Text style={styles.bulkButtonText}>
+              {selected.size === filteredTasks.length
+                ? "전체 해제"
+                : "전체 선택"}
+            </Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            onPress={deleteSelectedTasks}
+            style={[styles.bulkButton, styles.bulkDeleteButton]}
+          >
+            <Text style={[styles.bulkButtonText, styles.bulkDeleteText]}>
+              삭제
+            </Text>
+          </TouchableOpacity>
+        </View>
+      )}
       {/* 필터 버튼 */}
       <View style={styles.filterContainer}>
         {["all", "today", "completed"].map((f) => (
@@ -176,6 +282,11 @@ export default function TaskListScreen() {
         onPress={() => navigation.navigate("TaskDetail", { taskId: null })}
       >
         <Text style={styles.addButtonText}>＋</Text>
+      </TouchableOpacity>
+      <TouchableOpacity style={styles.selectButton} onPress={toggleSelectMode}>
+        <Text style={styles.selectButtonText}>
+          {selectMode ? "취소" : "선택"}
+        </Text>
       </TouchableOpacity>
     </SafeAreaView>
   );
@@ -292,4 +403,39 @@ const styles = StyleSheet.create({
     fontSize: 28,
     lineHeight: 30,
   },
+  selectButton: {
+    position: "absolute",
+    left: 20,
+    bottom: 30,
+    backgroundColor: "#007AFF",
+    paddingHorizontal: 20,
+    paddingVertical: 12,
+    borderRadius: 24,
+  },
+  selectButtonText: { color: "#fff", fontWeight: "bold" },
+  bulkActions: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderBottomWidth: 1,
+    borderColor: "#eee",
+    backgroundColor: "#f9f9f9",
+  },
+  bulkButton: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4 },
+  bulkButtonText: { fontSize: 14, color: "#007AFF" },
+  bulkDeleteButton: { backgroundColor: "#dc3545" },
+  bulkDeleteText: { color: "#fff" },
+  selectItem: { flexDirection: "row", alignItems: "center" },
+  checkbox: {
+    width: 24,
+    height: 24,
+    borderWidth: 1,
+    borderColor: "#ccc",
+    borderRadius: 4,
+    marginRight: 12,
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  checkmark: { fontSize: 16, color: "#007AFF" },
 });

@@ -31,3 +31,10 @@ export async function deleteTask(id) {
   const filtered = all.filter((t) => t.id !== id);
   await saveAllTasks(filtered);
 }
+
+export async function deleteTasks(ids) {
+  const all = await getAllTasks();
+  const idSet = new Set(ids);
+  const filtered = all.filter((t) => !idSet.has(t.id));
+  await saveAllTasks(filtered);
+}
