@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getMemories } from "../utils/memoryStore";
+import { splitKoreanName } from "../utils/nameUtils";
 
 export default function HomeScreen() {
   const navigation = useNavigation();
@@ -98,7 +99,9 @@ export default function HomeScreen() {
       <ScrollView contentContainerStyle={styles.content}>
         {/* 사용자 인사말 */}
         {userName ? (
-          <Text style={styles.greeting}>{`${userName}님, 반가워요!`}</Text>
+          <Text style={styles.greeting}>
+            {`${splitKoreanName(userName).firstName}님, 반가워요!`}
+          </Text>
         ) : null}
 
         {/* 오늘 할 일 */}
