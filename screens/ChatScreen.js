@@ -19,9 +19,9 @@ import {
   View,
 } from "react-native";
 import { getMemories, saveMemory } from "../utils/memoryStore";
+import { scheduleNotificationWithId } from "../utils/notifications";
 import { extractTasks } from "../utils/taskExtractor";
 import { addTask } from "../utils/taskStore";
-import { scheduleNotificationWithId } from "./HomeScreen";
 
 export default function ChatScreen() {
   const navigation = useNavigation();
