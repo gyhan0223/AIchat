@@ -21,7 +21,7 @@ import {
 import { getMemories, saveMemory } from "../utils/memoryStore";
 import { extractTasks } from "../utils/taskExtractor";
 import { addTask } from "../utils/taskStore";
-import { scheduleNotificationWithId } from "./HomeScreen";
+import { scheduleNotificationWithId } from "../utils/notifications";
 
 export default function ChatScreen() {
   const navigation = useNavigation();
