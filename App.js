@@ -10,6 +10,8 @@ import { SafeAreaProvider } from "react-native-safe-area-context";
 import ChatListScreen from "./screens/ChatListScreen";
 import ChatScreen from "./screens/ChatScreen";
 import HomeScreen from "./screens/HomeScreen";
+import MemoryDetailScreen from "./screens/MemoryDetailScreen";
+import MemoryListScreen from "./screens/MemoryListScreen";
 import TaskDetailScreen from "./screens/TaskDetailScreen";
 import TaskListScreen from "./screens/TaskListScreen";
 import { getMemories } from "./utils/memoryStore";
@@ -61,6 +63,8 @@ export default function App() {
             <Stack.Screen name="ChatList" component={ChatListScreen} />
             <Stack.Screen name="Tasks" component={TaskListScreen} />
             <Stack.Screen name="TaskDetail" component={TaskDetailScreen} />
+            <Stack.Screen name="Memories" component={MemoryListScreen} />
+            <Stack.Screen name="MemoryDetail" component={MemoryDetailScreen} />
           </Stack.Navigator>
         </NavigationContainer>
       </SafeAreaProvider>

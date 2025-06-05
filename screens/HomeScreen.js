@@ -163,6 +163,14 @@ export default function HomeScreen() {
         <Text style={styles.infoButtonText}>내 정보 보기</Text>
       </TouchableOpacity>
 
+      {/* 기억 관리 버튼 */}
+      <TouchableOpacity
+        style={styles.manageButton}
+        onPress={() => navigation.navigate("Memories")}
+      >
+        <Text style={styles.manageButtonText}>기억 관리</Text>
+      </TouchableOpacity>
+
       {/* 하단 네비게이션 버튼들 */}
       <View style={styles.navContainer}>
         <TouchableOpacity
@@ -231,6 +239,22 @@ const styles = StyleSheet.create({
     marginHorizontal: 6,
   },
   infoButtonText: {
+    color: "#fff",
+    fontSize: 16,
+    fontWeight: "bold",
+  },
+  manageButton: {
+    position: "absolute",
+    bottom: 160,
+    left: 16,
+    right: 16,
+    backgroundColor: "#ff9900",
+    paddingVertical: 14,
+    borderRadius: 8,
+    alignItems: "center",
+    marginHorizontal: 6,
+  },
+  manageButtonText: {
     color: "#fff",
     fontSize: 16,
     fontWeight: "bold",
