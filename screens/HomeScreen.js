@@ -211,7 +211,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: "#fff" },
   content: {
     padding: 16,
-    paddingBottom: Platform.OS === "ios" ? 180 : 160, // 버튼 공간 추가 확보
+    paddingBottom: Platform.OS === "ios" ? 220 : 200, // 버튼 공간 추가 확보
   },
   greeting: {
     fontSize: 20,
@@ -240,7 +240,7 @@ const styles = StyleSheet.create({
   },
   infoButton: {
     position: "absolute",
-    bottom: 100, // 네비게이션 버튼 위에 위치
+    bottom: 110, // 네비게이션 버튼 위에 위치
     left: 16,
     right: 16,
     backgroundColor: "#28a745",
@@ -256,7 +256,7 @@ const styles = StyleSheet.create({
   },
   nameButton: {
     position: "absolute",
-    bottom: 130,
+    bottom: 160,
     left: 16,
     right: 16,
     backgroundColor: "#6c63ff",
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
   },
   manageButton: {
     position: "absolute",
-    bottom: 160,
+    bottom: 210,
     left: 16,
     right: 16,
     backgroundColor: "#ff9900",
