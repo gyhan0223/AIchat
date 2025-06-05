@@ -1,6 +1,7 @@
 import { OPENAI_API_KEY } from "@env";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation, useRoute } from "@react-navigation/native";
+import * as Clipboard from "expo-clipboard";
 import { useEffect, useRef, useState } from "react";
 import {
   Alert,
@@ -193,6 +194,10 @@ export default function ChatScreen() {
       minute: "numeric",
     });
   };
+  const copyToClipboard = async (text) => {
+    await Clipboard.setStringAsync(text);
+    Alert.alert("복사됨", "메시지가 복사되었습니다.");
+  };
 
   const getAIResponse = async (text) => {
     try {
@@ -321,15 +326,23 @@ export default function ChatScreen() {
                     {isUser ? (
                       <>
                         <Text style={styles.timeText}>{timeStr}</Text>
-                        <View style={styles.userBubble}>
-                          <Text style={styles.bubbleText}>{item.text}</Text>
-                        </View>
+                        <TouchableOpacity
+                          onLongPress={() => copyToClipboard(item.text)}
+                        >
+                          <View style={styles.userBubble}>
+                            <Text style={styles.bubbleText}>{item.text}</Text>
+                          </View>
+                        </TouchableOpacity>
                       </>
                     ) : (
                       <View style={{ width: "100%" }}>
-                        <View style={styles.aiBubble}>
-                          <Text style={styles.bubbleText}>{item.text}</Text>
-                        </View>
+                        <TouchableOpacity
+                          onLongPress={() => copyToClipboard(item.text)}
+                        >
+                          <View style={styles.aiBubble}>
+                            <Text style={styles.bubbleText}>{item.text}</Text>
+                          </View>
+                        </TouchableOpacity>
                         <Text style={styles.timeText}>{timeStr}</Text>
 
                         {/* 이름 물어보는 AI 메시지 아래에 이름 저장 알림 */}
