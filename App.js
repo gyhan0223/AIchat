@@ -12,8 +12,10 @@ import ChatScreen from "./screens/ChatScreen";
 import HomeScreen from "./screens/HomeScreen";
 import MemoryDetailScreen from "./screens/MemoryDetailScreen";
 import MemoryListScreen from "./screens/MemoryListScreen";
+import NameChangeScreen from "./screens/NameChangeScreen";
 import TaskDetailScreen from "./screens/TaskDetailScreen";
 import TaskListScreen from "./screens/TaskListScreen";
+
 import { getMemories } from "./utils/memoryStore";
 
 const Stack = createNativeStackNavigator();
@@ -65,6 +67,7 @@ export default function App() {
             <Stack.Screen name="TaskDetail" component={TaskDetailScreen} />
             <Stack.Screen name="Memories" component={MemoryListScreen} />
             <Stack.Screen name="MemoryDetail" component={MemoryDetailScreen} />
+            <Stack.Screen name="ChangeName" component={NameChangeScreen} />
           </Stack.Navigator>
         </NavigationContainer>
       </SafeAreaProvider>
