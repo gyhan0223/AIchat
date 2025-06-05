@@ -34,6 +34,14 @@ export default function ChatScreen() {
   const [extractedTasks, setExtractedTasks] = useState([]);
   const [sessionTitle, setSessionTitle] = useState("");
   const [nameStored, setNameStored] = useState(false);
+  const [nameJustStored, setNameJustStored] = useState(false);
+
+  useEffect(() => {
+    if (nameJustStored) {
+      const t = setTimeout(() => setNameJustStored(false), 3000);
+      return () => clearTimeout(t);
+    }
+  }, [nameJustStored]);
 
   const screenW = Dimensions.get("window").width;
   const slideAnim = useRef(new Animated.Value(screenW)).current;
@@ -105,6 +113,7 @@ export default function ChatScreen() {
       const userName = input.trim();
       await AsyncStorage.setItem("userName", userName);
       setNameStored(true);
+      setNameJustStored(true);
       setSessionTitle(userName);
 
       // 세션 제목도 사용자 이름으로 업데이트
@@ -321,7 +330,7 @@ export default function ChatScreen() {
                         <Text style={styles.timeText}>{timeStr}</Text>
 
                         {/* 이름 물어보는 AI 메시지 아래에 이름 저장 알림 */}
-                        {isNameAskAI && nameStored && (
+                        {isNameAskAI && nameJustStored && (
                           <View style={styles.nameConfirmContainer}>
                             <Text style={styles.nameConfirmText}>
                               🎉 AI가 사용자의 이름을 기억했습니다!
