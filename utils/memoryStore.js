@@ -51,3 +51,18 @@ export const deleteMemory = async (index) => {
     console.error("기억 삭제 실패:", e);
   }
 };
+
+export const deleteMemories = async (indices) => {
+  try {
+    const existing = await AsyncStorage.getItem(STORAGE_KEY);
+    const memories = existing ? JSON.parse(existing) : [];
+    if (!Array.isArray(indices) || indices.length === 0) {
+      return;
+    }
+    const indexSet = new Set(indices);
+    const filtered = memories.filter((_, idx) => !indexSet.has(idx));
+    await AsyncStorage.setItem(STORAGE_KEY, JSON.stringify(filtered));
+  } catch (e) {
+    console.error("다중 기억 삭제 실패:", e);
+  }
+};
