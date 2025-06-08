@@ -2,8 +2,8 @@
 import { NavigationContainer } from "@react-navigation/native";
 import { createNativeStackNavigator } from "@react-navigation/native-stack";
 import * as Notifications from "expo-notifications";
+import { StatusBar } from "expo-status-bar";
 import { useEffect } from "react";
-import { StatusBar } from "react-native";
 import { GestureHandlerRootView } from "react-native-gesture-handler"; // 추가
 import { SafeAreaProvider } from "react-native-safe-area-context";
 
@@ -50,11 +50,8 @@ export default function App() {
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>
-        <StatusBar
-          backgroundColor="black"
-          barStyle="light-content"
-          translucent={false}
-        />
+        <StatusBar style="light" backgroundColor="black" />
+
         <NavigationContainer>
           <Stack.Navigator
             initialRouteName="Home"
