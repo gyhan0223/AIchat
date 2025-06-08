@@ -116,12 +116,13 @@ export default function ChatScreen() {
   }, [sessionId]);
 
   const handleSend = async () => {
-    if (!input.trim()) return;
+    const trimmed = input.trim();
+    if (!trimmed) return;
     const now = new Date().toISOString();
 
     // 첫 메시지 이후, 이름이 아직 저장되지 않았다면 사용자 입력을 이름으로 저장
     if (!nameStored && messages.length >= 1 && messages[0].sender === "ai") {
-      const userName = input.trim();
+      const userName = trimmed;
       await AsyncStorage.setItem("userName", userName);
       setNameStored(true);
       setNameJustStored(true);
@@ -139,7 +140,7 @@ export default function ChatScreen() {
     }
 
     // 유저 메시지 추가
-    const userMessage = { sender: "user", text: input, timestamp: now };
+    const userMessage = { sender: "user", text: trimmed, timestamp: now };
     let updated = [...messages, userMessage];
     setMessages(updated);
     await AsyncStorage.setItem(
@@ -151,9 +152,9 @@ export default function ChatScreen() {
     if (occupationAsked) {
       if (awaitingStudentLevel) {
         let level = "학생";
-        if (input.includes("중")) level = "중학생";
-        else if (input.includes("고")) level = "고등학생";
-        else if (input.includes("대")) level = "대학생";
+        if (trimmed.includes("중")) level = "중학생";
+        else if (trimmed.includes("고")) level = "고등학생";
+        else if (trimmed.includes("대")) level = "대학생";
         await saveUserInfo({ job: level });
         const aiMsg = {
           sender: "ai",
@@ -178,7 +179,7 @@ export default function ChatScreen() {
         await saveMemory(memory);
         return;
       } else {
-        if (input.includes("학생")) {
+        if (trimmed.includes("학생")) {
           await saveUserInfo({ job: "학생" });
           const aiMsg = {
             sender: "ai",
@@ -193,7 +194,7 @@ export default function ChatScreen() {
           );
           setAwaitingStudentLevel(true);
           return;
-        } else if (input.includes("직장")) {
+        } else if (trimmed.includes("직장")) {
           await saveUserInfo({ job: "직장인" });
           const aiMsg = {
             sender: "ai",
@@ -220,7 +221,7 @@ export default function ChatScreen() {
     }
 
     // AI 응답
-    const aiReply = await getAIResponse(input);
+    const aiReply = await getAIResponse(trimmed);
     const aiMessage = {
       sender: "ai",
       text: aiReply,
@@ -251,11 +252,11 @@ export default function ChatScreen() {
 
     // 메모리 저장
     const tasksForToday = [];
-    const date = await extractDate(input);
-    const time = await extractTime(input);
-    const notifId = await scheduleNotificationWithId(input, date, time);
+    const date = await extractDate(trimmed);
+    const time = await extractTime(trimmed);
+    const notifId = await scheduleNotificationWithId(trimmed, date, time);
     const memory = {
-      user: input,
+      user: trimmed,
       ai: aiReply,
       timestamp: new Date().toISOString(),
       type: tasksForToday.length > 0 ? "todayTask" : "normal",
