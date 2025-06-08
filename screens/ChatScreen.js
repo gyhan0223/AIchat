@@ -23,6 +23,7 @@ import { getMemories, saveMemory } from "../utils/memoryStore";
 import { scheduleNotificationWithId } from "../utils/notifications";
 import { extractTasks } from "../utils/taskExtractor";
 import { addTask } from "../utils/taskStore";
+import { getUserInfo, saveUserInfo } from "../utils/userInfoStore";
 
 export default function ChatScreen() {
   const navigation = useNavigation();
@@ -36,6 +37,8 @@ export default function ChatScreen() {
   const [sessionTitle, setSessionTitle] = useState("");
   const [nameStored, setNameStored] = useState(false);
   const [nameJustStored, setNameJustStored] = useState(false);
+  const [occupationAsked, setOccupationAsked] = useState(false);
+  const [awaitingStudentLevel, setAwaitingStudentLevel] = useState(false);
 
   useEffect(() => {
     if (nameJustStored) {
@@ -57,6 +60,8 @@ export default function ChatScreen() {
         setSessionTitle(storedName);
       }
 
+      const info = await getUserInfo();
+
       // 해당 세션 메시지 불러오기
       const saved = await AsyncStorage.getItem(`chatMessages:${sessionId}`);
       let msgs = saved ? JSON.parse(saved) : [];
@@ -74,7 +79,12 @@ export default function ChatScreen() {
         let welcomeText =
           "안녕하세요! 만나서 반가워요. 이름이 어떻게 되시나요?";
         if (storedName) {
-          welcomeText = `${storedName}님, 반갑습니다. 혹시 학생이신가요, 직장인이신가요?`;
+          if (info.job) {
+            welcomeText = `${storedName}님, 다시 오셨군요!`;
+          } else {
+            welcomeText = `${storedName}님, 반갑습니다. 혹시 학생이신가요, 직장인이신가요?`;
+            setOccupationAsked(true);
+          }
         }
         const now = new Date().toISOString();
         const aiMsg = { sender: "ai", text: welcomeText, timestamp: now };
@@ -130,7 +140,7 @@ export default function ChatScreen() {
 
     // 유저 메시지 추가
     const userMessage = { sender: "user", text: input, timestamp: now };
-    const updated = [...messages, userMessage];
+    let updated = [...messages, userMessage];
     setMessages(updated);
     await AsyncStorage.setItem(
       `chatMessages:${sessionId}`,
@@ -138,6 +148,76 @@ export default function ChatScreen() {
     );
     setInput("");
     flatListRef.current?.scrollToEnd({ animated: true });
+    if (occupationAsked) {
+      if (awaitingStudentLevel) {
+        let level = "학생";
+        if (input.includes("중")) level = "중학생";
+        else if (input.includes("고")) level = "고등학생";
+        else if (input.includes("대")) level = "대학생";
+        await saveUserInfo({ job: level });
+        const aiMsg = {
+          sender: "ai",
+          text: `${level}이시군요! 반가워요.`,
+          timestamp: new Date().toISOString(),
+        };
+        updated = [...updated, aiMsg];
+        setMessages(updated);
+        await AsyncStorage.setItem(
+          `chatMessages:${sessionId}`,
+          JSON.stringify(updated)
+        );
+        setOccupationAsked(false);
+        setAwaitingStudentLevel(false);
+
+        const memory = {
+          user: "사용자의 직업",
+          ai: level,
+          timestamp: new Date().toISOString(),
+          type: "userInfo",
+        };
+        await saveMemory(memory);
+        return;
+      } else {
+        if (input.includes("학생")) {
+          await saveUserInfo({ job: "학생" });
+          const aiMsg = {
+            sender: "ai",
+            text: "중학생인가요, 고등학생인가요, 대학생인가요?",
+            timestamp: new Date().toISOString(),
+          };
+          updated = [...updated, aiMsg];
+          setMessages(updated);
+          await AsyncStorage.setItem(
+            `chatMessages:${sessionId}`,
+            JSON.stringify(updated)
+          );
+          setAwaitingStudentLevel(true);
+          return;
+        } else if (input.includes("직장")) {
+          await saveUserInfo({ job: "직장인" });
+          const aiMsg = {
+            sender: "ai",
+            text: "어떤 분야에서 일하고 계신가요?",
+            timestamp: new Date().toISOString(),
+          };
+          updated = [...updated, aiMsg];
+          setMessages(updated);
+          await AsyncStorage.setItem(
+            `chatMessages:${sessionId}`,
+            JSON.stringify(updated)
+          );
+          setOccupationAsked(false);
+          const memory = {
+            user: "사용자의 직업",
+            ai: "직장인",
+            timestamp: new Date().toISOString(),
+            type: "userInfo",
+          };
+          await saveMemory(memory);
+          return;
+        }
+      }
+    }
 
     // AI 응답
     const aiReply = await getAIResponse(input);
@@ -206,8 +286,15 @@ export default function ChatScreen() {
         { role: "user", content: m.user },
         { role: "assistant", content: m.ai },
       ]);
+      const info = await getUserInfo();
+      let infoIntro = "";
+      if (info.job) {
+        infoIntro += `사용자의 직업은 ${info.job}입니다.`;
+      }
 
       const systemPrompt = `
+               ${infoIntro}
+
          너는 사용자의 친근한 전문 코치야. 사용자의 정보를 파악하기 위해 질문을 단계적으로 이어 가야 해.
         한 번에 여러 질문을 하지 말고, 직업이나 나이 등은 하나씩 차근차근 물어본다.
         사용자의 이전 답에 따라 다음 질문을 결정하라.

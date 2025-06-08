@@ -14,6 +14,8 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getMemories } from "../utils/memoryStore";
+import { getUserInfo } from "../utils/userInfoStore";
+
 import { splitKoreanName } from "../utils/nameUtils";
 
 export default function HomeScreen() {
@@ -75,10 +77,17 @@ export default function HomeScreen() {
   const viewUserInfo = async () => {
     const storedName = await AsyncStorage.getItem("userName");
     const memories = await getMemories();
+    const info = await getUserInfo();
+
     let infoText = "";
 
     // 이름
     infoText += storedName ? `이름: ${storedName}\n\n` : "";
+
+    // 직업 정보
+    if (info.job) {
+      infoText += `직업: ${info.job}\n\n`;
+    }
 
     // 메모리 항목들
     if (memories.length === 0) {
