@@ -19,6 +19,7 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { summarizeUserInfo } from "../utils/infoSummarizer";
 import { getMemories, saveMemory } from "../utils/memoryStore";
 import { scheduleNotificationWithId } from "../utils/notifications";
 import { extractTasks } from "../utils/taskExtractor";
@@ -303,22 +304,23 @@ export default function ChatScreen() {
       console.warn("extractTasks 오류:", e);
     }
 
-    // 메모리 저장
-    const tasksForToday = [];
-    const date = await extractDate(trimmed);
-    const time = await extractTime(trimmed);
-    const notifId = await scheduleNotificationWithId(trimmed, date, time);
-    const memory = {
-      user: trimmed,
-      ai: aiReply,
-      timestamp: new Date().toISOString(),
-      type: tasksForToday.length > 0 ? "todayTask" : "normal",
-      tasks: tasksForToday,
-      meta: date
-        ? { date, time, event: "알 수 없음", notificationId: notifId }
-        : undefined,
-    };
-    await saveMemory(memory);
+    // 메모리 저장 - 사용자 정보만 요약하여 기록
+    const summary = await summarizeUserInfo(trimmed);
+    if (summary) {
+      const date = await extractDate(trimmed);
+      const time = await extractTime(trimmed);
+      const notifId = await scheduleNotificationWithId(trimmed, date, time);
+      const memory = {
+        user: summary,
+        ai: "",
+        timestamp: new Date().toISOString(),
+        type: "userInfo",
+        meta: date
+          ? { date, time, event: "알 수 없음", notificationId: notifId }
+          : undefined,
+      };
+      await saveMemory(memory);
+    }
   };
 
   const formatTime = (iso) => {
