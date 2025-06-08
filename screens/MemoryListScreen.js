@@ -162,7 +162,7 @@ export default function MemoryListScreen() {
       )}
       <FlatList
         data={memories}
-        keyExtractor={(_, idx) => String(idx)}
+        keyExtractor={(item) => item.timestamp}
         renderItem={renderItem}
         ListEmptyComponent={
           <View style={styles.empty}>

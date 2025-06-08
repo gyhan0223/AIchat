@@ -146,6 +146,26 @@ export default function ChatScreen() {
           s.id === sessionId ? { ...s, title: userName } : s
         );
         await AsyncStorage.setItem("chatSessions", JSON.stringify(updated));
+        {
+          const sessionsJson = await AsyncStorage.getItem("chatSessions");
+          if (sessionsJson) {
+            const sessions = JSON.parse(sessionsJson);
+            const idx = sessions.findIndex((s) => s.id === sessionId);
+            if (idx !== -1) {
+              const session = sessions[idx];
+              if (session.title === "새 대화") {
+                session.title = input.trim().slice(0, 20);
+                setSessionTitle(session.title);
+              }
+              session.last = now;
+              sessions[idx] = session;
+              await AsyncStorage.setItem(
+                "chatSessions",
+                JSON.stringify(sessions)
+              );
+            }
+          }
+        }
       }
     }
 
@@ -252,6 +272,17 @@ export default function ChatScreen() {
       `chatMessages:${sessionId}`,
       JSON.stringify(final)
     );
+    {
+      const sessionsJson = await AsyncStorage.getItem("chatSessions");
+      if (sessionsJson) {
+        const sessions = JSON.parse(sessionsJson);
+        const idx = sessions.findIndex((s) => s.id === sessionId);
+        if (idx !== -1) {
+          sessions[idx] = { ...sessions[idx], last: aiMessage.timestamp };
+          await AsyncStorage.setItem("chatSessions", JSON.stringify(sessions));
+        }
+      }
+    }
     flatListRef.current?.scrollToEnd({ animated: true });
 
     // 할 일 추출

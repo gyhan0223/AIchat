@@ -1,7 +1,7 @@
 // screens/ChatListScreen.js
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useNavigation } from "@react-navigation/native";
-import { useEffect, useState } from "react";
+import { useFocusEffect, useNavigation } from "@react-navigation/native";
+import { useCallback, useEffect, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -18,19 +18,51 @@ export default function ChatListScreen() {
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState(new Set());
 
-  useEffect(() => {
-    const loadSessions = async () => {
-      const json = await AsyncStorage.getItem("chatSessions");
-      if (json) setSessions(JSON.parse(json));
-    };
-    loadSessions();
+  const formatRelativeTime = (iso) => {
+    if (!iso) return "";
+    const t = new Date(iso);
+    const now = new Date();
+    const diff = now.getTime() - t.getTime();
+    const mins = diff / 60000;
+    if (mins < 1) return "방금";
+    if (mins < 60) return `${Math.floor(mins)}분 전`;
+    const hours = mins / 60;
+    if (hours < 24) return `${Math.floor(hours)}시간 전`;
+    const days = hours / 24;
+    if (days < 7) return `${Math.floor(days)}일 전`;
+    return `${t.getFullYear()}년 ${t.getMonth() + 1}월 ${t.getDate()}일`;
+  };
+
+  const loadSessions = useCallback(async () => {
+    const json = await AsyncStorage.getItem("chatSessions");
+    let list = json ? JSON.parse(json) : [];
+    // 최근 메시지 시간 로드
+    for (const s of list) {
+      const msgsJson = await AsyncStorage.getItem(`chatMessages:${s.id}`);
+      if (msgsJson) {
+        const msgs = JSON.parse(msgsJson);
+        if (msgs.length > 0) {
+          s.last = msgs[msgs.length - 1].timestamp;
+        }
+      }
+    }
+    setSessions(list);
   }, []);
 
+  useEffect(() => {
+    loadSessions();
+  }, [loadSessions]);
+
+  useFocusEffect(
+    useCallback(() => {
+      loadSessions();
+    }, [loadSessions])
+  );
   const startNewSession = async () => {
     const id = Date.now().toString();
     const start = new Date().toISOString();
     // title을 "새 대화"로 초기화
-    const newSession = { id, start, title: "새 대화" };
+    const newSession = { id, start, title: "새 대화", last: start };
     const updated = [...sessions, newSession];
     setSessions(updated);
     await AsyncStorage.setItem("chatSessions", JSON.stringify(updated));
@@ -108,11 +140,14 @@ export default function ChatListScreen() {
     }
     return (
       <TouchableOpacity
-        style={styles.item}
+        style={[styles.item, styles.itemRow]}
         onPress={() => selectSession(item.id)}
       >
-        <Text style={styles.title}>
+        <Text style={styles.title} numberOfLines={1}>
           {item.title || new Date(item.start).toLocaleString()}
+        </Text>
+        <Text style={styles.time}>
+          {formatRelativeTime(item.last || item.start)}
         </Text>
       </TouchableOpacity>
     );
@@ -170,10 +205,17 @@ const styles = StyleSheet.create({
     borderBottomWidth: 1,
     borderColor: "#eee",
   },
+  itemRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+  },
   title: {
     fontSize: 16,
     color: "#333",
+    flexShrink: 1,
   },
+  time: { fontSize: 14, color: "#666", marginLeft: 8 },
   empty: {
     flex: 1,
     justifyContent: "center",
