@@ -65,6 +65,10 @@ export default function ChatScreen() {
       // 해당 세션 메시지 불러오기
       const saved = await AsyncStorage.getItem(`chatMessages:${sessionId}`);
       let msgs = saved ? JSON.parse(saved) : [];
+      msgs = msgs.map((m, idx) => ({
+        id: m.id ?? `${m.timestamp}-${idx}`,
+        ...m,
+      }));
 
       // 세션 제목 로드
       const sessionsJson = await AsyncStorage.getItem("chatSessions");
@@ -87,7 +91,12 @@ export default function ChatScreen() {
           }
         }
         const now = new Date().toISOString();
-        const aiMsg = { sender: "ai", text: welcomeText, timestamp: now };
+        const aiMsg = {
+          id: `${Date.now()}-${Math.random()}`,
+          sender: "ai",
+          text: welcomeText,
+          timestamp: now,
+        };
         msgs = [aiMsg];
         await AsyncStorage.setItem(
           `chatMessages:${sessionId}`,
@@ -104,6 +113,7 @@ export default function ChatScreen() {
         if (m.type === "todayTask" && m.timestamp.startsWith(today)) {
           m.tasks.forEach((task) => {
             const aiMsg = {
+              id: `${Date.now()}-${Math.random()}`,
               sender: "ai",
               text: `오늘 "${task}" 한다고 했잖아. 지금 하고 있어?`,
               timestamp: new Date().toISOString(),
@@ -140,7 +150,12 @@ export default function ChatScreen() {
     }
 
     // 유저 메시지 추가
-    const userMessage = { sender: "user", text: trimmed, timestamp: now };
+    const userMessage = {
+      id: `${Date.now()}-${Math.random()}`,
+      sender: "user",
+      text: input,
+      timestamp: now,
+    };
     let updated = [...messages, userMessage];
     setMessages(updated);
     await AsyncStorage.setItem(
@@ -157,6 +172,7 @@ export default function ChatScreen() {
         else if (trimmed.includes("대")) level = "대학생";
         await saveUserInfo({ job: level });
         const aiMsg = {
+          id: `${Date.now()}-${Math.random()}`,
           sender: "ai",
           text: `${level}이시군요! 반가워요.`,
           timestamp: new Date().toISOString(),
@@ -182,6 +198,7 @@ export default function ChatScreen() {
         if (trimmed.includes("학생")) {
           await saveUserInfo({ job: "학생" });
           const aiMsg = {
+            id: `${Date.now()}-${Math.random()}`,
             sender: "ai",
             text: "중학생인가요, 고등학생인가요, 대학생인가요?",
             timestamp: new Date().toISOString(),
@@ -197,6 +214,7 @@ export default function ChatScreen() {
         } else if (trimmed.includes("직장")) {
           await saveUserInfo({ job: "직장인" });
           const aiMsg = {
+            id: `${Date.now()}-${Math.random()}`,
             sender: "ai",
             text: "어떤 분야에서 일하고 계신가요?",
             timestamp: new Date().toISOString(),
@@ -223,6 +241,7 @@ export default function ChatScreen() {
     // AI 응답
     const aiReply = await getAIResponse(trimmed);
     const aiMessage = {
+      id: `${Date.now()}-${Math.random()}`,
       sender: "ai",
       text: aiReply,
       timestamp: new Date().toISOString(),
@@ -458,7 +477,7 @@ export default function ChatScreen() {
                   </View>
                 );
               }}
-              keyExtractor={(_, i) => i.toString()}
+              keyExtractor={(item) => item.id}
               contentContainerStyle={styles.chatContainer}
               keyboardShouldPersistTaps="handled"
               keyboardDismissMode="on-drag"
