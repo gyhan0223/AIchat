@@ -14,6 +14,7 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { getMemories } from "../utils/memoryStore";
+import { getAllTasks } from "../utils/taskStore";
 import { getUserInfo } from "../utils/userInfoStore";
 
 import { splitKoreanName } from "../utils/nameUtils";
@@ -26,7 +27,7 @@ export default function HomeScreen() {
   const [worries, setWorries] = useState([]);
   const [emotions, setEmotions] = useState([]);
 
-  // 화면 포커스 시마다 userName 갱신
+  // 화면 포커스 시마다 사용자 이름과 오늘 할 일 갱신
   useFocusEffect(
     useCallback(() => {
       (async () => {
@@ -34,6 +35,12 @@ export default function HomeScreen() {
         if (storedName) {
           setUserName(storedName);
         }
+        const tasks = await getAllTasks();
+        const today = new Date().toISOString().split("T")[0];
+        const todayList = tasks.filter(
+          (t) => t.dueDate === today && !t.completed
+        );
+        setTodayTasks(todayList);
       })();
     }, [])
   );
@@ -42,12 +49,6 @@ export default function HomeScreen() {
     (async () => {
       const all = await getMemories();
       const today = new Date().toISOString().split("T")[0];
-
-      // 오늘 일정
-      const todayList = all.filter(
-        (m) => m.type === "todayTask" && m.timestamp.startsWith(today)
-      );
-      setTodayTasks(todayList);
 
       // 미래 이벤트
       const futureList = all.filter((m) => m.meta?.date && m.meta.date > today);
@@ -119,9 +120,9 @@ export default function HomeScreen() {
           {todayTasks.length === 0 ? (
             <Text style={styles.emptyText}>오늘 일정이 없습니다.</Text>
           ) : (
-            todayTasks.map((m, idx) => (
-              <Text key={idx} style={styles.itemText}>
-                • {m.tasks.join(", ")}
+            todayTasks.map((t) => (
+              <Text key={t.id} style={styles.itemText}>
+                • {t.content}
               </Text>
             ))
           )}
