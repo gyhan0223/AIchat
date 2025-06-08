@@ -293,7 +293,10 @@ export default function ChatScreen() {
       if (tasks.length > 0) {
         setExtractedTasks(tasks);
         for (const task of tasks) {
-          await addTask(task);
+          await addTask({
+            ...task,
+            id: `${Date.now()}-${Math.random()}`,
+          });
         }
       }
     } catch (e) {

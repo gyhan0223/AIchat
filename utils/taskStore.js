@@ -4,7 +4,28 @@ const TASKS_KEY = "storedTasks";
 
 export async function getAllTasks() {
   const json = await AsyncStorage.getItem(TASKS_KEY);
-  return json ? JSON.parse(json) : [];
+  if (!json) return [];
+  try {
+    const tasks = JSON.parse(json);
+    const seen = new Set();
+    let changed = false;
+    const fixed = tasks.map((t, idx) => {
+      if (seen.has(t.id)) {
+        changed = true;
+        const newId = `${t.id}-${idx}-${Date.now()}`;
+        seen.add(newId);
+        return { ...t, id: newId };
+      }
+      seen.add(t.id);
+      return t;
+    });
+    if (changed) {
+      await saveAllTasks(fixed);
+    }
+    return fixed;
+  } catch {
+    return [];
+  }
 }
 
 export async function saveAllTasks(tasks) {
