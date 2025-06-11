@@ -1,7 +1,7 @@
 // screens/TaskListScreen.js
 import { useFocusEffect, useNavigation } from "@react-navigation/native";
 import { format } from "date-fns"; // 날짜 형식 맞추기용 (설치 필요: yarn add date-fns)
-import { useCallback, useState } from "react";
+import { useCallback, useRef, useState } from "react";
 import {
   Alert,
   FlatList,
@@ -26,6 +26,9 @@ export default function TaskListScreen() {
   const [filter, setFilter] = useState("all"); // 'all' | 'today' | 'completed'
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState(new Set());
+  // Swipeable refs and open directions
+  const swipeRefs = useRef({});
+  const openDirections = useRef({});
 
   // 오늘 날짜 문자열: '2025-06-01' 같은 형식
   const todayString = new Date().toISOString().split("T")[0];
@@ -96,6 +99,20 @@ export default function TaskListScreen() {
     if (filter === "completed") return t.completed === true;
     return true;
   });
+  const handleWillOpen = (id, direction) => {
+    const current = openDirections.current[id];
+    if (current && current !== direction) {
+      swipeRefs.current[id]?.close();
+    }
+  };
+
+  const handleOpen = (id, direction) => {
+    openDirections.current[id] = direction;
+  };
+
+  const handleClose = (id) => {
+    openDirections.current[id] = null;
+  };
 
   // 왼쪽(완료/취소) 버튼
   const renderLeftActions = (item) => {
@@ -183,10 +200,14 @@ export default function TaskListScreen() {
     }
     return (
       <Swipeable
+        ref={(ref) => (swipeRefs.current[item.id] = ref)}
         renderLeftActions={() => renderLeftActions(item)}
         renderRightActions={() => renderRightActions(item)}
         leftThreshold={30}
         rightThreshold={40}
+        onSwipeableWillOpen={(dir) => handleWillOpen(item.id, dir)}
+        onSwipeableOpen={(dir) => handleOpen(item.id, dir)}
+        onSwipeableClose={() => handleClose(item.id)}
       >
         <TouchableOpacity
           style={[styles.taskRow, item.completed && styles.completedRow]}
