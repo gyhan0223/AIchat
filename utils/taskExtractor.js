@@ -5,10 +5,9 @@ export async function extractTasks(conversation) {
    * conversation: [{ sender: "user"|"ai", text: "..." }, ... ]
    * 최종적으로 [{ id: "1", content: "할 일 내용", dueDate: "YYYY-MM-DD" }, ...] 형태의 배열을 반환해야 함
    */
-  // 1) 대화 전체를 문자열 형태로 합치기
-  const history = conversation
-    .map((m) => `${m.sender === "user" ? "User" : "AI"}: ${m.text}`)
-    .join("\n");
+  // 1) 유저 발화만 모아 문자열 형태로 합치기
+  const userHistory = conversation.filter((m) => m.sender === "user");
+  const history = userHistory.map((m) => `User: ${m.text}`).join("\n");
 
   // 2) AI에게 JSON 배열 형태로만 응답 요청
   const systemPrompt = `

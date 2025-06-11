@@ -9,7 +9,7 @@ export async function generateTitle(conversation) {
   const history = conversation
     .map((m) => `${m.sender === "user" ? "User" : "AI"}: ${m.text}`)
     .join("\n");
-  const systemPrompt = `다음 대화를 보고 전체적인 주제가 드러나는 간결한 제목을 15자 이내의 한글로 작성해. 다른 말은 하지 말고 제목만 답해.`;
+  const systemPrompt = `다음 대화를 보고 전체적인 주제가 드러나는 간결한 제목을 10자 이내의 한글로 작성해. 다른 말은 하지 말고 제목만 답해.`;
 
   try {
     const res = await fetch("https://api.openai.com/v1/chat/completions", {
