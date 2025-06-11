@@ -24,6 +24,7 @@ import { getMemories, saveMemory } from "../utils/memoryStore";
 import { scheduleNotificationWithId } from "../utils/notifications";
 import { extractTasks } from "../utils/taskExtractor";
 import { addTask } from "../utils/taskStore";
+import { generateTitle } from "../utils/titleGenerator";
 import { getUserInfo, saveUserInfo } from "../utils/userInfoStore";
 
 export default function ChatScreen() {
@@ -40,6 +41,21 @@ export default function ChatScreen() {
   const [nameJustStored, setNameJustStored] = useState(false);
   const [occupationAsked, setOccupationAsked] = useState(false);
   const [awaitingStudentLevel, setAwaitingStudentLevel] = useState(false);
+
+  const updateSessionTitle = async (msgs) => {
+    const title = await generateTitle(msgs);
+    if (!title) return;
+    setSessionTitle(title);
+    const sessionsJson = await AsyncStorage.getItem("chatSessions");
+    if (sessionsJson) {
+      const sessions = JSON.parse(sessionsJson);
+      const idx = sessions.findIndex((s) => s.id === sessionId);
+      if (idx !== -1) {
+        sessions[idx] = { ...sessions[idx], title };
+        await AsyncStorage.setItem("chatSessions", JSON.stringify(sessions));
+      }
+    }
+  };
 
   useEffect(() => {
     if (nameJustStored) {
@@ -322,6 +338,10 @@ export default function ChatScreen() {
       };
       await saveMemory(memory);
     }
+
+    await updateSessionTitle(
+      final.map((m) => ({ sender: m.sender, text: m.text }))
+    );
   };
 
   const formatTime = (iso) => {
