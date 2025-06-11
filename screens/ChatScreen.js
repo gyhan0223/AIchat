@@ -42,11 +42,11 @@ export default function ChatScreen() {
   const [occupationAsked, setOccupationAsked] = useState(false);
   const [awaitingStudentLevel, setAwaitingStudentLevel] = useState(false);
   const initialMessagesLoaded = useRef(false);
+  const [titleGenerated, setTitleGenerated] = useState(false);
 
   const updateSessionTitle = async (msgs) => {
-    // 최근 대화 내용을 기반으로 제목을 생성한다
-    const recent = msgs.slice(-6);
-    const title = await generateTitle(recent);
+    const base = msgs.slice(0, 10);
+    const title = await generateTitle(base);
     if (!title) return;
     setSessionTitle(title);
     const sessionsJson = await AsyncStorage.getItem("chatSessions");
@@ -54,10 +54,11 @@ export default function ChatScreen() {
       const sessions = JSON.parse(sessionsJson);
       const idx = sessions.findIndex((s) => s.id === sessionId);
       if (idx !== -1) {
-        sessions[idx] = { ...sessions[idx], title };
+        sessions[idx] = { ...sessions[idx], title, titleGenerated: true };
         await AsyncStorage.setItem("chatSessions", JSON.stringify(sessions));
       }
     }
+    setTitleGenerated(true);
   };
 
   useEffect(() => {
@@ -96,7 +97,10 @@ export default function ChatScreen() {
       if (sessionsJson) {
         const sessions = JSON.parse(sessionsJson);
         const target = sessions.find((s) => s.id === sessionId);
-        if (target) setSessionTitle(target.title);
+        if (target) {
+          setSessionTitle(target.title);
+          if (target.titleGenerated) setTitleGenerated(true);
+        }
       }
 
       // 새 세션이라면 초기 메시지 추가
@@ -147,16 +151,17 @@ export default function ChatScreen() {
     })();
   }, [sessionId]);
 
-  // 대화 내용이 변경될 때마다 제목을 갱신한다
+  // 초기 대화 내용으로 제목을 한 번만 생성한다
   useEffect(() => {
     if (!initialMessagesLoaded.current) return;
-    if (messages.length === 0) return;
+    if (titleGenerated) return;
+    if (messages.length < 10) return;
     (async () => {
       await updateSessionTitle(
-        messages.map((m) => ({ sender: m.sender, text: m.text }))
+        messages.slice(0, 10).map((m) => ({ sender: m.sender, text: m.text }))
       );
     })();
-  }, [messages]);
+  }, [messages, titleGenerated]);
 
   const handleSend = async () => {
     const trimmed = input.trim();

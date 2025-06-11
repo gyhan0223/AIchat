@@ -62,7 +62,13 @@ export default function ChatListScreen() {
     const id = Date.now().toString();
     const start = new Date().toISOString();
     // title을 "새 대화"로 초기화
-    const newSession = { id, start, title: "새 대화", last: start };
+    const newSession = {
+      id,
+      start,
+      title: "새 대화",
+      last: start,
+      titleGenerated: false,
+    };
     const updated = [...sessions, newSession];
     setSessions(updated);
     await AsyncStorage.setItem("chatSessions", JSON.stringify(updated));
