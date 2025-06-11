@@ -569,6 +569,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "flex-start",
     marginVertical: 4,
+    width: "100%",
   },
   userRow: { justifyContent: "flex-end" },
   aiRow: { justifyContent: "flex-start" },
