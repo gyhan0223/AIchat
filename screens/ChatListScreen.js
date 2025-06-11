@@ -10,6 +10,8 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
+import { RectButton, Swipeable } from "react-native-gesture-handler";
+
 import { SafeAreaView } from "react-native-safe-area-context";
 
 export default function ChatListScreen() {
@@ -126,7 +128,31 @@ export default function ChatListScreen() {
   const selectSession = (id) => {
     navigation.navigate("Chat", { sessionId: id });
   };
-
+  const renderRightActions = (id) => (
+    <RectButton
+      style={[styles.actionButton, styles.deleteButton]}
+      onPress={() => {
+        Alert.alert("정말 삭제할까요?", "", [
+          { text: "취소", style: "cancel" },
+          {
+            text: "삭제",
+            style: "destructive",
+            onPress: async () => {
+              const remaining = sessions.filter((s) => s.id !== id);
+              setSessions(remaining);
+              await AsyncStorage.setItem(
+                "chatSessions",
+                JSON.stringify(remaining)
+              );
+              await AsyncStorage.removeItem(`chatMessages:${id}`);
+            },
+          },
+        ]);
+      }}
+    >
+      <Text style={styles.actionText}>삭제</Text>
+    </RectButton>
+  );
   const renderItem = ({ item }) => {
     if (selectMode) {
       const checked = selected.has(item.id);
@@ -145,17 +171,22 @@ export default function ChatListScreen() {
       );
     }
     return (
-      <TouchableOpacity
-        style={[styles.item, styles.itemRow]}
-        onPress={() => selectSession(item.id)}
+      <Swipeable
+        renderRightActions={() => renderRightActions(item.id)}
+        rightThreshold={40}
       >
-        <Text style={styles.title} numberOfLines={1}>
-          {item.title || new Date(item.start).toLocaleString()}
-        </Text>
-        <Text style={styles.time}>
-          {formatRelativeTime(item.last || item.start)}
-        </Text>
-      </TouchableOpacity>
+        <TouchableOpacity
+          style={[styles.item, styles.itemRow]}
+          onPress={() => selectSession(item.id)}
+        >
+          <Text style={styles.title} numberOfLines={1}>
+            {item.title || new Date(item.start).toLocaleString()}
+          </Text>
+          <Text style={styles.time}>
+            {formatRelativeTime(item.last || item.start)}
+          </Text>
+        </TouchableOpacity>
+      </Swipeable>
     );
   };
 
@@ -269,6 +300,15 @@ const styles = StyleSheet.create({
   bulkButtonText: { fontSize: 14, color: "#007AFF" },
   bulkDeleteButton: { backgroundColor: "#dc3545" },
   bulkDeleteText: { color: "#fff" },
+  actionButton: {
+    justifyContent: "center",
+    alignItems: "center",
+    width: 80,
+    marginVertical: 4,
+    borderRadius: 4,
+  },
+  deleteButton: { backgroundColor: "#dc3545" },
+  actionText: { color: "#fff", fontWeight: "bold" },
   selectItem: { flexDirection: "row", alignItems: "center" },
   checkbox: {
     width: 24,
