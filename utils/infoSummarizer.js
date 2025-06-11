@@ -21,7 +21,15 @@ export async function summarizeUserInfo(text) {
       }),
     });
     const data = await res.json();
-    return data.choices?.[0]?.message?.content.trim() || "";
+    const text = data.choices?.[0]?.message?.content.trim() || "";
+    if (
+      text === "빈 문자열" ||
+      text === '""' ||
+      text.replace(/\s|"/g, "") === ""
+    ) {
+      return "";
+    }
+    return text;
   } catch (e) {
     console.warn("summarizeUserInfo error:", e);
     return "";

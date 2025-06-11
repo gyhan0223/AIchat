@@ -304,7 +304,11 @@ export default function ChatScreen() {
 
     // 메모리 저장 - 사용자 정보만 요약하여 기록
     const summary = await summarizeUserInfo(trimmed);
-    if (summary) {
+    if (
+      summary &&
+      summary !== "빈 문자열" &&
+      summary.replace(/\s|"|'/g, "") !== ""
+    ) {
       const date = await extractDate(trimmed);
       const time = await extractTime(trimmed);
       const notifId = await scheduleNotificationWithId(trimmed, date, time);
