@@ -377,6 +377,13 @@ export default function ChatScreen() {
     await Clipboard.setStringAsync(text);
     Alert.alert("복사됨", "메시지가 복사되었습니다.");
   };
+  const copyAllMessages = async () => {
+    const history = messages
+      .map((m) => `${m.sender === "ai" ? "ai" : "사용자"} : ${m.text}`)
+      .join("\n");
+    await Clipboard.setStringAsync(history);
+    Alert.alert("복사됨", "전체 대화가 복사되었습니다.");
+  };
 
   const getAIResponse = async (text) => {
     try {
@@ -398,7 +405,11 @@ export default function ChatScreen() {
         한 번에 여러 질문을 하지 말고, 직업이나 나이 등은 하나씩 차근차근 물어본다.
         사용자의 이전 답에 따라 다음 질문을 결정하라.
         예를 들어 학생이라고 하면 꿈이나 진학 목표를 묻고, 좋은 대학을 원한다면 내신 또는 모의고사 성적을 물어보는 식으로 이어 간다.
+
         직장인이라면 현재 일하는 분야와 경력, 앞으로의 목표를 순서대로 물어본다.
+        사용자가 특별히 조언을 요구하지 않았다면 어떤 도움이 필요한지 먼저 확인한다.
+        예를 들어 "앱을 개발하고 있어요"라고만 말한다면 앱의 용도나 목표 사용자 등 세부 사항을 물어본다.
+        충분한 정보를 얻은 뒤에야 상황에 맞는 조언을 제공한다.
 
         답변은 다음 형식을 따른다:
         1) 먼저 짧은 격려나 맞장구로 시작한다. (예: "와, 멋진 목표네요!", "좋아요, 한번 해보죠!")
@@ -587,6 +598,9 @@ export default function ChatScreen() {
               ]}
             >
               <Text style={styles.settingsTitle}>설정</Text>
+              <TouchableOpacity onPress={copyAllMessages}>
+                <Text style={styles.copyAllText}>전체 대화 복사하기</Text>
+              </TouchableOpacity>
               <TouchableOpacity onPress={toggleSettings}>
                 <Text style={styles.closeText}>닫기</Text>
               </TouchableOpacity>
@@ -692,5 +706,7 @@ const styles = StyleSheet.create({
     elevation: 5,
   },
   settingsTitle: { fontSize: 18, fontWeight: "bold", marginBottom: 12 },
+  copyAllText: { fontSize: 16, color: "#007AFF", marginBottom: 12 },
+
   closeText: { marginTop: 20, fontSize: 16, color: "#007AFF" },
 });
