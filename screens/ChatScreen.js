@@ -41,6 +41,7 @@ export default function ChatScreen() {
   const [nameJustStored, setNameJustStored] = useState(false);
   const [occupationAsked, setOccupationAsked] = useState(false);
   const [awaitingStudentLevel, setAwaitingStudentLevel] = useState(false);
+  const initialMessagesLoaded = useRef(false);
 
   const updateSessionTitle = async (msgs) => {
     // 최근 대화 내용을 기반으로 제목을 생성한다
@@ -71,6 +72,7 @@ export default function ChatScreen() {
   const flatListRef = useRef();
 
   useEffect(() => {
+    initialMessagesLoaded.current = false;
     (async () => {
       // 저장된 사용자 이름 로드
       const storedName = await AsyncStorage.getItem("userName");
@@ -141,11 +143,13 @@ export default function ChatScreen() {
           });
         }
       });
+      initialMessagesLoaded.current = true;
     })();
   }, [sessionId]);
 
   // 대화 내용이 변경될 때마다 제목을 갱신한다
   useEffect(() => {
+    if (!initialMessagesLoaded.current) return;
     if (messages.length === 0) return;
     (async () => {
       await updateSessionTitle(
