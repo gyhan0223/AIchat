@@ -464,8 +464,7 @@ export default function ChatScreen() {
                     ]}
                   >
                     {isUser ? (
-                      <>
-                        <Text style={styles.timeText}>{timeStr}</Text>
+                      <View style={{ width: "100%", alignItems: "flex-end" }}>
                         <TouchableOpacity
                           onLongPress={() => copyToClipboard(item.text)}
                         >
@@ -473,7 +472,8 @@ export default function ChatScreen() {
                             <Text style={styles.bubbleText}>{item.text}</Text>
                           </View>
                         </TouchableOpacity>
-                      </>
+                        <Text style={styles.timeText}>{timeStr}</Text>
+                      </View>
                     ) : (
                       <View style={{ width: "100%" }}>
                         <TouchableOpacity
