@@ -248,6 +248,7 @@ export default function ChatScreen() {
           info: `사용자의 직업은 ${level}입니다.`,
           timestamp: new Date().toISOString(),
           type: "userInfo",
+          sessionId,
         };
         await saveMemory(memory);
         return;
@@ -287,6 +288,7 @@ export default function ChatScreen() {
             info: "사용자의 직업은 직장인입니다.",
             timestamp: new Date().toISOString(),
             type: "userInfo",
+            sessionId,
           };
           await saveMemory(memory);
           return;
@@ -353,6 +355,7 @@ export default function ChatScreen() {
         info: summary,
         timestamp: new Date().toISOString(),
         type: "userInfo",
+        sessionId,
         meta: date
           ? { date, time, event: "알 수 없음", notificationId: notifId }
           : undefined,

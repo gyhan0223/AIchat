@@ -13,6 +13,8 @@ import HomeScreen from "./screens/HomeScreen";
 import MemoryDetailScreen from "./screens/MemoryDetailScreen";
 import MemoryListScreen from "./screens/MemoryListScreen";
 import NameChangeScreen from "./screens/NameChangeScreen";
+import SessionDeleteScreen from "./screens/SessionDeleteScreen";
+
 import TaskDetailScreen from "./screens/TaskDetailScreen";
 import TaskListScreen from "./screens/TaskListScreen";
 
@@ -65,6 +67,10 @@ export default function App() {
             <Stack.Screen name="Memories" component={MemoryListScreen} />
             <Stack.Screen name="MemoryDetail" component={MemoryDetailScreen} />
             <Stack.Screen name="ChangeName" component={NameChangeScreen} />
+            <Stack.Screen
+              name="SessionDelete"
+              component={SessionDeleteScreen}
+            />
           </Stack.Navigator>
         </NavigationContainer>
       </SafeAreaProvider>

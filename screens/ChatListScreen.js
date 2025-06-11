@@ -13,6 +13,10 @@ import {
 import { RectButton, Swipeable } from "react-native-gesture-handler";
 
 import { SafeAreaView } from "react-native-safe-area-context";
+import {
+  getMemoriesBySession,
+  getMemoriesBySessions,
+} from "../utils/memoryStore";
 
 export default function ChatListScreen() {
   const navigation = useNavigation();
@@ -102,6 +106,36 @@ export default function ChatListScreen() {
       setSelected(new Set(sessions.map((s) => s.id)));
     }
   };
+  const removeSessions = async (ids) => {
+    const remaining = sessions.filter((s) => !ids.includes(s.id));
+    setSessions(remaining);
+    await AsyncStorage.setItem("chatSessions", JSON.stringify(remaining));
+    for (const id of ids) {
+      await AsyncStorage.removeItem(`chatMessages:${id}`);
+    }
+  };
+
+  const confirmDeleteOnly = (id) => {
+    Alert.alert("정말 삭제할까요?", "", [
+      { text: "취소", style: "cancel" },
+      {
+        text: "삭제",
+        style: "destructive",
+        onPress: async () => {
+          await removeSessions([id]);
+        },
+      },
+    ]);
+  };
+
+  const confirmDeleteWithMem = async (id) => {
+    const mems = await getMemoriesBySession(id);
+    if (mems.length > 0) {
+      navigation.navigate("SessionDelete", { sessionIds: [id] });
+    } else {
+      confirmDeleteOnly(id);
+    }
+  };
 
   const deleteSelectedSessions = () => {
     const ids = Array.from(selected);
@@ -112,14 +146,24 @@ export default function ChatListScreen() {
         text: "삭제",
         style: "destructive",
         onPress: async () => {
-          const remaining = sessions.filter((s) => !selected.has(s.id));
-          setSessions(remaining);
-          await AsyncStorage.setItem("chatSessions", JSON.stringify(remaining));
-          for (const id of ids) {
-            await AsyncStorage.removeItem(`chatMessages:${id}`);
+          const mems = await getMemoriesBySessions(ids);
+          if (mems.length > 0) {
+            setSelected(new Set());
+            setSelectMode(false);
+            navigation.navigate("SessionDelete", { sessionIds: ids });
+          } else {
+            const remaining = sessions.filter((s) => !selected.has(s.id));
+            setSessions(remaining);
+            await AsyncStorage.setItem(
+              "chatSessions",
+              JSON.stringify(remaining)
+            );
+            for (const id of ids) {
+              await AsyncStorage.removeItem(`chatMessages:${id}`);
+            }
+            setSelected(new Set());
+            setSelectMode(false);
           }
-          setSelected(new Set());
-          setSelectMode(false);
         },
       },
     ]);
@@ -129,29 +173,20 @@ export default function ChatListScreen() {
     navigation.navigate("Chat", { sessionId: id });
   };
   const renderRightActions = (id) => (
-    <RectButton
-      style={[styles.actionButton, styles.deleteButton]}
-      onPress={() => {
-        Alert.alert("정말 삭제할까요?", "", [
-          { text: "취소", style: "cancel" },
-          {
-            text: "삭제",
-            style: "destructive",
-            onPress: async () => {
-              const remaining = sessions.filter((s) => s.id !== id);
-              setSessions(remaining);
-              await AsyncStorage.setItem(
-                "chatSessions",
-                JSON.stringify(remaining)
-              );
-              await AsyncStorage.removeItem(`chatMessages:${id}`);
-            },
-          },
-        ]);
-      }}
-    >
-      <Text style={styles.actionText}>삭제</Text>
-    </RectButton>
+    <View style={{ flexDirection: "row" }}>
+      <RectButton
+        style={[styles.actionButton, styles.deleteButton]}
+        onPress={() => confirmDeleteOnly(id)}
+      >
+        <Text style={styles.actionText}>삭제</Text>
+      </RectButton>
+      <RectButton
+        style={[styles.actionButton, styles.deleteButton]}
+        onPress={() => confirmDeleteWithMem(id)}
+      >
+        <Text style={styles.actionText}>기억삭제</Text>
+      </RectButton>
+    </View>
   );
   const renderItem = ({ item }) => {
     if (selectMode) {

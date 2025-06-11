@@ -23,7 +23,20 @@ export const getMemories = async () => {
     return [];
   }
 };
+export const getMemoriesBySession = async (sessionId) => {
+  const all = await getMemories();
+  return all
+    .map((m, idx) => ({ ...m, index: idx }))
+    .filter((m) => m.sessionId === sessionId);
+};
 
+export const getMemoriesBySessions = async (sessionIds) => {
+  const all = await getMemories();
+  const set = new Set(sessionIds);
+  return all
+    .map((m, idx) => ({ ...m, index: idx }))
+    .filter((m) => set.has(m.sessionId));
+};
 export const updateMemory = async (index, updated) => {
   try {
     const existing = await AsyncStorage.getItem(STORAGE_KEY);
