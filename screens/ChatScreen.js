@@ -43,7 +43,9 @@ export default function ChatScreen() {
   const [awaitingStudentLevel, setAwaitingStudentLevel] = useState(false);
 
   const updateSessionTitle = async (msgs) => {
-    const title = await generateTitle(msgs);
+    // 최근 대화 내용을 기반으로 제목을 생성한다
+    const recent = msgs.slice(-6);
+    const title = await generateTitle(recent);
     if (!title) return;
     setSessionTitle(title);
     const sessionsJson = await AsyncStorage.getItem("chatSessions");
@@ -141,6 +143,16 @@ export default function ChatScreen() {
       });
     })();
   }, [sessionId]);
+
+  // 대화 내용이 변경될 때마다 제목을 갱신한다
+  useEffect(() => {
+    if (messages.length === 0) return;
+    (async () => {
+      await updateSessionTitle(
+        messages.map((m) => ({ sender: m.sender, text: m.text }))
+      );
+    })();
+  }, [messages]);
 
   const handleSend = async () => {
     const trimmed = input.trim();
@@ -339,9 +351,7 @@ export default function ChatScreen() {
       await saveMemory(memory);
     }
 
-    await updateSessionTitle(
-      final.map((m) => ({ sender: m.sender, text: m.text }))
-    );
+    // 제목 업데이트는 messages 상태 변화를 통해 처리한다
   };
 
   const formatTime = (iso) => {
