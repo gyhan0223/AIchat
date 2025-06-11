@@ -29,6 +29,7 @@ export default function TaskListScreen() {
   // Swipeable refs and open directions
   const swipeRefs = useRef({});
   const openDirections = useRef({});
+  const blockOpen = useRef({});
 
   // 오늘 날짜 문자열: '2025-06-01' 같은 형식
   const todayString = new Date().toISOString().split("T")[0];
@@ -102,16 +103,24 @@ export default function TaskListScreen() {
   const handleWillOpen = (id, direction) => {
     const current = openDirections.current[id];
     if (current && current !== direction) {
+      blockOpen.current[id] = true;
+
       swipeRefs.current[id]?.close();
     }
   };
 
   const handleOpen = (id, direction) => {
+    if (blockOpen.current[id]) {
+      swipeRefs.current[id]?.close();
+      blockOpen.current[id] = false;
+      return;
+    }
     openDirections.current[id] = direction;
   };
 
   const handleClose = (id) => {
     openDirections.current[id] = null;
+    blockOpen.current[id] = false;
   };
 
   // 왼쪽(완료/취소) 버튼
