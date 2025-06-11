@@ -97,7 +97,8 @@ export default function HomeScreen() {
       infoText += "저장된 기억:\n";
       memories.forEach((m, idx) => {
         const time = m.timestamp.split("T")[0];
-        infoText += `${idx + 1}. [${m.type}] ${time} - "${m.user}"\n`;
+        const text = m.info || m.user;
+        infoText += `${idx + 1}. [${m.type}] ${time} - "${text}"\n`;
       });
     }
 
@@ -136,7 +137,7 @@ export default function HomeScreen() {
           ) : (
             futureEvents.map((m, idx) => (
               <Text key={idx} style={styles.itemText}>
-                • {m.meta?.date} – {m.user}
+                • {m.meta?.date} – {m.info || m.user}
               </Text>
             ))
           )}
@@ -150,7 +151,7 @@ export default function HomeScreen() {
           ) : (
             worries.map((m, idx) => (
               <Text key={idx} style={styles.itemText}>
-                • {m.user}
+                • {m.info || m.user}
               </Text>
             ))
           )}

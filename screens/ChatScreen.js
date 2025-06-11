@@ -208,8 +208,7 @@ export default function ChatScreen() {
         setAwaitingStudentLevel(false);
 
         const memory = {
-          user: "사용자의 직업",
-          ai: level,
+          info: `사용자의 직업은 ${level}입니다.`,
           timestamp: new Date().toISOString(),
           type: "userInfo",
         };
@@ -248,8 +247,7 @@ export default function ChatScreen() {
           );
           setOccupationAsked(false);
           const memory = {
-            user: "사용자의 직업",
-            ai: "직장인",
+            info: "사용자의 직업은 직장인입니다.",
             timestamp: new Date().toISOString(),
             type: "userInfo",
           };
@@ -311,8 +309,7 @@ export default function ChatScreen() {
       const time = await extractTime(trimmed);
       const notifId = await scheduleNotificationWithId(trimmed, date, time);
       const memory = {
-        user: summary,
-        ai: "",
+        info: summary,
         timestamp: new Date().toISOString(),
         type: "userInfo",
         meta: date
@@ -338,10 +335,10 @@ export default function ChatScreen() {
   const getAIResponse = async (text) => {
     try {
       const past = await getMemories();
-      const recent = past.slice(-5).flatMap((m) => [
-        { role: "user", content: m.user },
-        { role: "assistant", content: m.ai },
-      ]);
+      const recent = past
+        .slice(-5)
+        .map((m) => ({ role: "system", content: m.info || m.user }))
+        .filter((m) => m.content);
       const info = await getUserInfo();
       let infoIntro = "";
       if (info.job) {

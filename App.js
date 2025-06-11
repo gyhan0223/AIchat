@@ -36,7 +36,7 @@ export default function App() {
           Notifications.scheduleNotificationAsync({
             content: {
               title: "📌 오늘 일정",
-              body: `"${memory.user}" 기억나? 오늘 그날이야!`,
+              body: `"${memory.info || memory.user}" 기억나? 오늘 그날이야!`,
             },
             trigger: null,
           });

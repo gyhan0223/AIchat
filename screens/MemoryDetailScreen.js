@@ -14,6 +14,7 @@ export default function MemoryDetailScreen() {
   const navigation = useNavigation();
   const route = useRoute();
   const { index } = route.params;
+  const [infoText, setInfoText] = useState("");
   const [userText, setUserText] = useState("");
   const [aiText, setAiText] = useState("");
 
@@ -21,14 +22,23 @@ export default function MemoryDetailScreen() {
     (async () => {
       const all = await getMemories();
       if (index != null && index < all.length) {
-        setUserText(all[index].user || "");
-        setAiText(all[index].ai || "");
+        const item = all[index];
+        if (item.info) {
+          setInfoText(item.info);
+        } else {
+          setUserText(item.user || "");
+          setAiText(item.ai || "");
+        }
       }
     })();
   }, [index]);
 
   const save = async () => {
-    await updateMemory(index, { user: userText, ai: aiText });
+    if (infoText) {
+      await updateMemory(index, { info: infoText });
+    } else {
+      await updateMemory(index, { user: userText, ai: aiText });
+    }
     Alert.alert("저장됨", "", [
       { text: "확인", onPress: () => navigation.goBack() },
     ]);
@@ -50,20 +60,34 @@ export default function MemoryDetailScreen() {
 
   return (
     <SafeAreaView style={styles.container}>
-      <Text style={styles.label}>사용자 메시지</Text>
-      <TextInput
-        style={styles.input}
-        value={userText}
-        onChangeText={setUserText}
-        multiline
-      />
-      <Text style={styles.label}>AI 응답</Text>
-      <TextInput
-        style={styles.input}
-        value={aiText}
-        onChangeText={setAiText}
-        multiline
-      />
+      {infoText ? (
+        <>
+          <Text style={styles.label}>정보</Text>
+          <TextInput
+            style={styles.input}
+            value={infoText}
+            onChangeText={setInfoText}
+            multiline
+          />
+        </>
+      ) : (
+        <>
+          <Text style={styles.label}>사용자 메시지</Text>
+          <TextInput
+            style={styles.input}
+            value={userText}
+            onChangeText={setUserText}
+            multiline
+          />
+          <Text style={styles.label}>AI 응답</Text>
+          <TextInput
+            style={styles.input}
+            value={aiText}
+            onChangeText={setAiText}
+            multiline
+          />
+        </>
+      )}
       <TouchableOpacity style={styles.saveButton} onPress={save}>
         <Text style={styles.saveButtonText}>저장</Text>
       </TouchableOpacity>

@@ -117,7 +117,7 @@ export default function MemoryListScreen() {
             {checked && <Text style={styles.checkmark}>✓</Text>}
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.itemText}>{item.user}</Text>
+            <Text style={styles.itemText}>{item.info || item.user}</Text>
             <Text style={styles.timeText}>{item.timestamp.split("T")[0]}</Text>
           </View>
         </TouchableOpacity>
@@ -134,7 +134,7 @@ export default function MemoryListScreen() {
           style={styles.item}
           onPress={() => navigation.navigate("MemoryDetail", { index })}
         >
-          <Text style={styles.itemText}>{item.user}</Text>
+          <Text style={styles.itemText}>{item.info || item.user}</Text>
           <Text style={styles.timeText}>{item.timestamp.split("T")[0]}</Text>
         </TouchableOpacity>
       </Swipeable>
