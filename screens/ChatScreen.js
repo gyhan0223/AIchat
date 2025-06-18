@@ -23,7 +23,6 @@ import { summarizeUserInfo } from "../utils/infoSummarizer";
 import { getMemories, saveMemory } from "../utils/memoryStore";
 import { scheduleNotificationWithId } from "../utils/notifications";
 import { extractTasks } from "../utils/taskExtractor";
-import { addTask } from "../utils/taskStore";
 import { generateTitle } from "../utils/titleGenerator";
 import { getUserInfo, saveUserInfo } from "../utils/userInfoStore";
 
@@ -329,13 +328,9 @@ export default function ChatScreen() {
         final.map((m) => ({ sender: m.sender, text: m.text }))
       );
       if (tasks.length > 0) {
+        // 바로 추가하지 않고 사용자 확인을 위해 보류 상태로 저장
+
         setExtractedTasks(tasks);
-        for (const task of tasks) {
-          await addTask({
-            ...task,
-            id: `${Date.now()}-${Math.random()}`,
-          });
-        }
       }
     } catch (e) {
       console.warn("extractTasks 오류:", e);
@@ -408,10 +403,11 @@ export default function ChatScreen() {
 
         직장인이라면 현재 일하는 분야와 경력, 앞으로의 목표를 순서대로 물어본다.
         사용자가 특별히 조언을 요구하지 않았다면 어떤 도움이 필요한지 먼저 확인한다.
- "도와줘", "어떻게", "조언"과 같이 명확한 도움 요청이 있을 때만 구체적인 단계 제안을 한다.
+        "도와줘", "어떻게", "조언"과 같이 명확한 도움 요청이 있을 때만 구체적인 단계 제안을 한다.
         사용자의 메시지에 그런 표현이 없다면 절대 바로 조언하지 말고,
         단순히 "사업을 준비하고 있어"처럼 상황만 말한 경우에는 먼저 어떤 부분에서
-        도움이 필요한지, 목표가 무엇인지 묻는다.        충분한 정보를 얻은 뒤에야 상황에 맞는 조언을 제공한다.
+        도움이 필요한지, 목표가 무엇인지 묻는다.
+        충분한 정보를 얻은 뒤에야 상황에 맞는 조언을 제공한다.
 
         답변은 다음 형식을 따른다:
         1) 먼저 짧은 격려나 맞장구로 시작한다. (예: "와, 멋진 목표네요!", "좋아요, 한번 해보죠!")
@@ -476,10 +472,23 @@ export default function ChatScreen() {
     const list = extractedTasks
       .map((t) => `• ${t.content}${t.dueDate ? ` (Due: ${t.dueDate})` : ""}`)
       .join("\n");
-    Alert.alert("추출된 할 일 목록", list, [
+    Alert.alert("추출된 할 일 목록", `${list}\n\n추가할까요?`, [
       {
-        text: "확인",
+        text: "아니오",
+        style: "cancel",
         onPress: () => setExtractedTasks([]),
+      },
+      {
+        text: "예",
+        onPress: async () => {
+          for (const task of extractedTasks) {
+            await addTask({
+              ...task,
+              id: `${Date.now()}-${Math.random()}`,
+            });
+          }
+          setExtractedTasks([]);
+        },
       },
     ]);
   };
@@ -560,7 +569,7 @@ export default function ChatScreen() {
                             style={styles.taskNoticeContainer}
                           >
                             <Text style={styles.taskNoticeText}>
-                              📝 할 일이 감지되었습니다. 확인하기
+                              📝 할 일이 감지되었습니다. 추가할까요?
                             </Text>
                           </TouchableOpacity>
                         )}
