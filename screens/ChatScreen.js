@@ -70,6 +70,22 @@ export default function ChatScreen() {
   const screenW = Dimensions.get("window").width;
   const slideAnim = useRef(new Animated.Value(screenW)).current;
   const flatListRef = useRef();
+  useEffect(() => {
+    const showSub = Keyboard.addListener("keyboardDidShow", () => {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 50);
+    });
+    const willShowSub = Keyboard.addListener("keyboardWillShow", () => {
+      setTimeout(() => {
+        flatListRef.current?.scrollToEnd({ animated: true });
+      }, 50);
+    });
+    return () => {
+      showSub.remove();
+      willShowSub.remove();
+    };
+  }, []);
 
   useEffect(() => {
     initialMessagesLoaded.current = false;
@@ -590,6 +606,9 @@ export default function ChatScreen() {
                 style={styles.input}
                 value={input}
                 onChangeText={setInput}
+                onFocus={() =>
+                  flatListRef.current?.scrollToEnd({ animated: true })
+                }
                 placeholder="메시지를 입력하세요"
                 placeholderTextColor="#999"
                 selectionColor="#007AFF"
