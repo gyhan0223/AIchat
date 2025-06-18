@@ -36,7 +36,6 @@ export default function NameChangeScreen() {
         value={name}
         onChangeText={setName}
         placeholder="이름을 입력하세요"
-        autoFocus
       />
       <TouchableOpacity style={styles.saveButton} onPress={saveName}>
         <Text style={styles.saveButtonText}>저장</Text>

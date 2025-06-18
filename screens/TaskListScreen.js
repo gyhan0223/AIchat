@@ -11,7 +11,9 @@ import {
   TouchableOpacity,
   View,
 } from "react-native";
-import { RectButton, Swipeable } from "react-native-gesture-handler";
+import { RectButton } from "react-native-gesture-handler";
+import Swipeable from "react-native-gesture-handler/ReanimatedSwipeable";
+
 import { SafeAreaView } from "react-native-safe-area-context"; // SafeAreaView 추가
 import {
   deleteTask,
