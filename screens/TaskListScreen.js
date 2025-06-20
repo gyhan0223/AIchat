@@ -220,7 +220,7 @@ export default function TaskListScreen() {
         onSwipeableOpen={(dir) => handleOpen(item.id, dir)}
         onSwipeableClose={() => handleClose(item.id)}
       >
-        <TouchableOpacity
+        <RectButton
           style={[styles.taskRow, item.completed && styles.completedRow]}
           onPress={() => navigation.navigate("TaskDetail", { taskId: item.id })}
         >
@@ -244,7 +244,7 @@ export default function TaskListScreen() {
               <Text style={styles.priorityText}>{item.priority}</Text>
             </View>
           )}
-        </TouchableOpacity>
+        </RectButton>
       </Swipeable>
     );
   };
